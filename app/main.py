@@ -33,15 +33,24 @@ def _display_data(pointcloud):
 
 def worker_process_function(msg):
     print("insert your program here")
+
+    #process the data, create a noiseless pointcloud
     pointcloud = message_to_pointcloud(msg)
     #pointcloud = denoise_data(pointcloud, 2)
 
+    #extract parameters to simplifly search
     perimeter = get_subject_perimeter(pointcloud)
     radius = get_subject_radius(pointcloud)
-
     depth = get_subject_depth(pointcloud)
-
     print(f"radius of the plate: {radius}, perimeter of the plate: {perimeter}, depth of the plate: {depth}")
+
+    #create feature list using ORB
+
+    #request a list of skus that match the parameters extracted earlier
+
+    #compare the list to the features
+
+    #publish matches
     
 def main():
     config = MQTTConfig(host=IP, port=PORT)
