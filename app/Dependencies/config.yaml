@@ -1,2 +1,5 @@
-key1: value1
-key2: value2
+# MQTT options ---------------------------------------
+ip: localhost
+port: 1883
+listen_topic: test/dummy_pointcloud/send_cloud
+publish_topic: test/dummy_pointcloud/send_matches
