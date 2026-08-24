@@ -1,11 +1,10 @@
 from dependencies.mqtt_functions import *
-from dependencies.feature_functions import *
-from dependencies.pointcloud_functions import *
+from dependencies.feature_functions import FeatureExtraction
 
 from dependencies import loadConfig
 import time
 import threading
-from queue import Empty, Queue
+from queue import  Queue
 from mqtt_client import MQTTClient, MQTTConfig
 from json import loads
 from logging import info
@@ -35,18 +34,16 @@ def _check_for_triggers(triggers:dict):
 
     return message
 
-def worker_process_function(msg):
-    print("insert your program here")
-
-    #process the data, create a noiseless pointcloud
-    pointcloud = message_to_pointcloud(msg)
-
+def worker_process_function(msg, client:MQTTClient):
     #extract parameters to simplifly search
-    perimeter = get_subject_perimeter(pointcloud)
-    radius = get_subject_radius(pointcloud)
-    depth = get_subject_depth(pointcloud)
-    print(f"radius of the plate: {radius}, perimeter of the plate: {perimeter}, depth of the plate: {depth}")
-
+    depth_image = loads(msg)["depth_image"]
+    details = FeatureExtraction.get_subject_details(depth_image)
+    print(f"radius of the plate: {details["radius"]}, perimeter of the plate: {details["perimeter"]}, depth of the plate: {details["depth"]}")
+    details["command"] = "search_phrase"
+    details["destination"] = "sku_table"
+    details["database_name"] = "churchill_database"
+    
+    client.publish(details)
     #create feature list using ORB
 
     #request a list of skus that match the parameters extracted earlier (seperate subscribe service, 
