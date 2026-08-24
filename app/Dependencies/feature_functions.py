@@ -2,24 +2,6 @@ import open3d as o3d
 import math
 import numpy as np
 
-def _display_data(pointcloud):
-    '''a helper function that displays the pointcloud data so it can be interpreted and debugged easier
-    Args: 
-        pointcloud: the pointcloud data, a list of touples containing the x, y and z of each point
-        '''
-    
-    # Open3D visualization expects an Open3D geometry object, not a raw numpy array.
-    point_cloud_for_display = o3d.geometry.PointCloud()
-    point_cloud_for_display.points = o3d.utility.Vector3dVector(np.asarray(pointcloud, dtype=np.float64))
-    try:
-        o3d.visualization.draw_geometries([point_cloud_for_display],
-                                        zoom=0.3412,
-                                        front=[0.4257, -0.2125, -0.8795],
-                                        lookat=[2.6172, 2.0475, 1.532],
-                                        up=[-0.0694, -0.9768, 0.2024])
-    except Exception as draw_error:
-        print(f"Visualization skipped: {draw_error}")
-
 def get_subject_depth(pointcloud):
     '''returns the depth of the subject
     Args:
@@ -76,17 +58,21 @@ def get_subject_radius(pointcloud):
 
     return radius
 
-def _find_edges(pointcloud, segment_Angle=1):
+def _batch_by_angle(pointcloud, segment_angle):
+    '''returns the point furthest from x=0, y=0 '''
+
+def _find_edges(pointcloud, segment_angle=20):
     '''returns the outermost points from the center of the cloud, sampled by angular segment
     Args:
         pointcloud: a list of point data
         segment_Angle: angular width of each sampling segment in degrees
     Returns:
         edge_cloud: a pointcloud array of points corresponding to the edges of the subject'''
+    
     if len(pointcloud) == 0:
         raise ValueError("pointcloud cannot be empty")
-    if not 0 < segment_Angle <= 360:
-        raise ValueError(f"segment angle of {segment_Angle} is not valid, must be between 0 and 360")
+    if not 0 < segment_angle <= 360:
+        raise ValueError(f"segment angle of {segment_angle} is not valid, must be between 0 and 360")
 
     point_array = np.asarray(pointcloud, dtype=float)
     if point_array.ndim != 2 or point_array.shape[1] < 2:
@@ -102,7 +88,7 @@ def _find_edges(pointcloud, segment_Angle=1):
     angles = np.arctan2(relative_points[:, 1], relative_points[:, 0])
     angles = (angles + 2 * math.pi) % (2 * math.pi)
 
-    segment_radians = math.radians(segment_Angle)
+    segment_radians = math.radians(segment_angle)
     bin_count = max(1, int(round((2 * math.pi) / segment_radians)))
     bin_width = (2 * math.pi) / bin_count
 
@@ -119,7 +105,7 @@ def _find_edges(pointcloud, segment_Angle=1):
 
     return np.asarray(edge_points, dtype=float)
 
-def get_subject_perimeter(pointcloud, segment_Angle=1):
+def get_subject_perimeter(pointcloud):
     '''returns the perimeter of the subject by interpolating between detected edge points
     Args: 
         pointcloud: the pointcloud data
@@ -128,15 +114,12 @@ def get_subject_perimeter(pointcloud, segment_Angle=1):
 
     if len(pointcloud) == 0:
         raise ValueError("pointcloud cannot be empty")
-    if not 0 < segment_Angle <= 360:
-        raise ValueError(f"segment angle of {segment_Angle} is not valid, must be between 0 and 360")
 
     point_array = np.asarray(pointcloud, dtype=float)
     if point_array.ndim != 2 or point_array.shape[1] < 2:
         raise ValueError("pointcloud must contain 2D or 3D point data")
 
-    edge_points = _find_edges(point_array, segment_Angle)
-    _display_data(edge_points)
+    edge_points = _find_edges(point_array)
     if len(edge_points) < 2:
         return 0.0
 

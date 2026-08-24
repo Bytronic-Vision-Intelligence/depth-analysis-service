@@ -57,14 +57,35 @@ def message_to_pointcloud(msg):
 
     return pointcloud
 
+def display_pointcloud(pointcloud):
+    '''a helper function that displays the pointcloud data so it can be interpreted and debugged easier
+    Args: 
+        pointcloud: the pointcloud data, a list of touples containing the x, y and z of each point
+        '''
+    
+    point_cloud_for_display = o3d.geometry.PointCloud()
+    point_cloud_for_display.points = o3d.utility.Vector3dVector(np.asarray(pointcloud, dtype=np.float64))
+    try:
+        o3d.visualization.draw_geometries([point_cloud_for_display],
+                                        zoom=0.3412,
+                                        front=[0.4257, -0.2125, -0.8795],
+                                        lookat=[2.6172, 2.0475, 1.532],
+                                        up=[-0.0694, -0.9768, 0.2024])
+    except Exception as draw_error:
+        print(f"Visualization skipped: {draw_error}")
+
+def _pointcloud_to_o3d_pointcloud(pointcloud):
+    '''converts a pointcloud into an o3d pointcloud'''
+    mesh = o3d.geometry.PointCloud(o3d.cpu.pybind.utility.Vector3dVector(pointcloud))
+    return mesh
+
 def normalise_cloud(pointcloud):
-    '''normalises the pointcloud to center the x and y axis on 0 and the z axis lowest value to 0'''
-
-def _downsample_pointcloud(pointcloud, voxel_size:float=0.05):
-
-    downpcd = pointcloud.voxel_down_sample(voxel_size=voxel_size)
-
-    return downpcd
+    '''normalises the pointcloud to center the x and y axis on 0 and the z axis lowest value to 0
+    Args:   
+        pointcloud: pointcloud data to be centered
+    Return:
+        normal_cloud: a normalised pointcloud'''
+    center_point = np.average(pointcloud)
 
 def cloud_to_mesh(pointcloud):
     '''Converts the cloud data to a mesh to make it easier to work with
@@ -72,17 +93,17 @@ def cloud_to_mesh(pointcloud):
         pointcloud: a list of touples containing the x, y and z axis data for the object scanned
     Returns:
         mesh: the mesh object returned'''
-    downsampled_cloud = _downsample_pointcloud(pointcloud)
+    downsampled_cloud = _pointcloud_to_o3d_pointcloud(pointcloud)
     downsampled_cloud.estimate_normals()
     distances = downsampled_cloud.compute_nearest_neighbor_distance()
     avg_dist = np.mean(distances)
+    print(avg_dist)
     radius = 1.5 * avg_dist
 
     mesh = o3d.geometry.TriangleMesh.create_from_point_cloud_ball_pivoting(
         downsampled_cloud,
         o3d.utility.DoubleVector([radius, radius * 2])
     )
-    o3d.io.write_triangle_mesh("output_mesh.ply", mesh)
     o3d.visualization.draw_geometries([mesh])
     return mesh
 

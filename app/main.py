@@ -7,36 +7,39 @@ import time
 import threading
 from queue import Empty, Queue
 from mqtt_client import MQTTClient, MQTTConfig
+from json import loads
+from logging import info
 #
-IP = loadConfig.return_config_value("ip")
-PORT = loadConfig.return_config_value("port")
-TRIGGER_TOPIC = loadConfig.return_config_value("listen_topic")
-OUTPUT_TOPIC = loadConfig.return_config_value("publish_topic") #this should be adjusted to suit your worker requirements
+MQTT_BROKERS = loadConfig.get_config("mqtt_options")
+TOPICS = loadConfig.get_config("topics")
 
-def _display_data(pointcloud):
-    '''a helper function that displays the pointcloud data so it can be interpreted and debugged easier
-    Args: 
-        pointcloud: the pointcloud data, a list of touples containing the x, y and z of each point
-        '''
-    
-    # Open3D visualization expects an Open3D geometry object, not a raw numpy array.
-    point_cloud_for_display = o3d.geometry.PointCloud()
-    point_cloud_for_display.points = o3d.utility.Vector3dVector(np.asarray(pointcloud, dtype=np.float64))
-    try:
-        o3d.visualization.draw_geometries([point_cloud_for_display],
-                                        zoom=0.3412,
-                                        front=[0.4257, -0.2125, -0.8795],
-                                        lookat=[2.6172, 2.0475, 1.532],
-                                        up=[-0.0694, -0.9768, 0.2024])
-    except Exception as draw_error:
-        print(f"Visualization skipped: {draw_error}")
+def _check_for_triggers(triggers:dict):
+    '''Checks the queue for each of the trigger topics and returns the message when any of them have received one
+    Args:
+        triggers: a dictionary of topics
+    Returns:
+        message: the message received from the trigger as dictionary'''
+    message = {"command": None}
+
+    for trigger in triggers:
+        try:
+            if not trigger["is_trigger"]:continue
+        except:
+            continue
+
+        try:
+            message = loads(trigger["queue"].get_nowait())
+        except Exception as e:
+            if e != KeyError: info(f"error occured when checking for trigger {e}")
+            continue
+
+    return message
 
 def worker_process_function(msg):
     print("insert your program here")
 
     #process the data, create a noiseless pointcloud
     pointcloud = message_to_pointcloud(msg)
-    #pointcloud = denoise_data(pointcloud, 2)
 
     #extract parameters to simplifly search
     perimeter = get_subject_perimeter(pointcloud)
@@ -46,42 +49,44 @@ def worker_process_function(msg):
 
     #create feature list using ORB
 
-    #request a list of skus that match the parameters extracted earlier
+    #request a list of skus that match the parameters extracted earlier (seperate subscribe service, 
+    # this is a blocking function, cannot continue until response or timeout)
 
     #compare the list to the features
 
-    #publish matches
+    #publish list of matches
     
 def main():
-    config = MQTTConfig(host=IP, port=PORT)
+    config = MQTTConfig(host=MQTT_BROKERS["mqtt_ip"], port=MQTT_BROKERS["mqtt_port"])
     client = MQTTClient(config)
     client.connect()
 
     event_queue = Queue()
     stop_event = threading.Event()
-    subscribe_thread = start_subscribe_thread(IP, PORT, TRIGGER_TOPIC, event_queue, stop_event)
+    for topic in TOPICS:
+        if not topic["is_subscribe"]:
+            continue
+        topic["queue"] = Queue()
+        
+        topic["thread"] = start_subscribe_thread(
+            MQTT_BROKERS["mqtt_ip"], 
+            MQTT_BROKERS["mqtt_port"], 
+            topic["topic"], 
+            topic["queue"],
+            stop_event
+        )
 
     try:
         while True:
             time.sleep(0.1)
-
-            try:
-                msg = event_queue.get_nowait()
-            except Empty:
+            message = _check_for_triggers(TOPICS)
+            if message is None:
                 continue
 
-            if msg is None:
-                print("Received invalid trigger payload; ignoring.")
-                continue
-
-            worker_process_function(msg)
+            worker_process_function(message)
 
     except KeyboardInterrupt:
         print("Shutting down subscribe listener and exiting.")
-    finally:
-        stop_event.set()
-        if subscribe_thread.is_alive():
-            subscribe_thread.join(timeout=2)
 
 if __name__ == "__main__":
     main()
