@@ -14,22 +14,16 @@ class FeatureExtraction():
         self.blur_value = blur_value
         self.blur_image = None
         self.binary_image = None
+        self.three_channel_binary = None
 
         pass
 
-    def _get_perimeter(self, image:ndarray, threshold_value:dict) -> float:
-        '''returns the perimeter of the largest contour found in an image
-        Args:
-            image: an ndarray containing the image
+    def _get_largest_contour(self):
+        '''finds the largest contour in an image and returns it
         Returns:
-            perimeter: a float representing the length of the largest contour arc
-        '''
-        blur = cv2.blur(image, self.blur_value)
-        ret, thresh = cv2.threshold(blur, 50, 255, cv2.THRESH_BINARY)
-        three_channel_binary = dstack((thresh, thresh, thresh))
-
+            largetst_contour: the largest contour by area'''
         contours, hierachy = cv2.findContours(
-            thresh,
+            self.binary_image,
             cv2.RETR_TREE,
             cv2.CHAIN_APPROX_SIMPLE
         )
@@ -37,54 +31,28 @@ class FeatureExtraction():
             info("INFO : No contour found in image")
             print("INFO : No contour found in image")
             return 0
+        
+        return max(contours, key = cv2.contourArea)
 
-        largest_contour = max(contours, key = cv2.contourArea)
-
-        three_channel_binary = cv2.drawContours(
-            three_channel_binary,
-            [largest_contour],
-            0,
-            128,
-            3
-        )
-
-        cv2.imwrite("perimeter.png", three_channel_binary)
+    def _get_perimeter(self) -> float:
+        '''returns the perimeter of the largest contour found in an image
+        Returns:
+            perimeter: a float representing the length of the largest contour arc
+        '''
+        largest_contour = self._get_largest_contour()
+        x,y,w,h = cv2.boundingRect(largest_contour)
         
         return cv2.arcLength(largest_contour, True)
 
 
-    def _get_radius(self, image:ndarray, threshold:dict) -> float:
+    def _get_radius(self) -> float:
         '''returns the radius of the largest blob found
-        Args:
-            image: an ndarray containing the image
         Returns:
             radius: a float representing the radius of the largest blob
         '''
-        
-        params = cv2.SimpleBlobDetector_Params()
-        params.filterByCircularity = True
-        params.minCircularity = 0.1
-        params.blobColor = 255
-
-        ver = (cv2.__version__).split('.')
-        if int(ver[0]) < 3:
-            detector = cv2.SimpleBlobDetector(params)
-        else:
-            detector = cv2.SimpleBlobDetector_create(params)
-
-        blur = cv2.blur(image, self.blur_value)
-        ret, thresh = cv2.threshold(blur, 50, 255, cv2.THRESH_BINARY)
-        if not ret: return 0
-        
-        keypoints = detector.detect(thresh)
-        if len(keypoints) == 0: return 0
-
-        keypoints_sorted = sorted(keypoints, key=lambda k: k.size / 2, reverse=True)
-        three_channel_binary = dstack((thresh, thresh, thresh))
-        cv2.drawKeypoints(three_channel_binary, keypoints, three_channel_binary, (0, 255, 0), cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
-        cv2.imwrite("radius.png", thresh)
-        
-        return keypoints_sorted[0].size/2
+        largest_contour = self._get_largest_contour()
+        x,y,w,h = cv2.boundingRect(largest_contour)
+        return (h/2+w/2)/2
 
 
     def get_subject_details(self,image:ndarray) -> dict:
@@ -95,6 +63,7 @@ class FeatureExtraction():
             details: a dictionary containing details of the image'''
         self.blur_image = cv2.blur(image, self.blur_value)
         ret, self.binary_image = cv2.threshold(self.blur_image, 50, 255, cv2.THRESH_BINARY)
+        self.three_channel_binary = dstack((self.binary_image, self.binary_image, self.binary_image))
         
         details = dict()
         single_channel = image if image.ndim == 2 else image[:, :, 0]
@@ -105,6 +74,6 @@ class FeatureExtraction():
             "max": average(single_channel) + average(single_channel)/2
         }
         
-        details["perimeter"] = self._get_perimeter(single_channel, thresh)
-        details["radius"] = self._get_radius(single_channel, thresh)
+        details["perimeter"] = self._get_perimeter()
+        details["radius"] = self._get_radius()
         return details

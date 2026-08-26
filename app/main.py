@@ -54,8 +54,8 @@ def worker_process_function(msg, client:MQTTClient):
     feature_extractor = FeatureExtraction([7,7])
 
     image_decoded = extract_image(msg["image"])
-    image = Image(image_decoded, IMAGE_DETAILS["region_of_interest"])
-    depth_image = image.cropped_image
+    image = Image(image_decoded, IMAGE_DETAILS["region_of_interest"], IMAGE_DETAILS["trim_value"])
+    depth_image = image.cropped_image[:,:,0]
     
     details = feature_extractor.get_subject_details(depth_image)
     print(f"radius of the plate: {details['radius']}, perimeter of the plate: {details['perimeter']}, depth of the plate: {details['depth']}")

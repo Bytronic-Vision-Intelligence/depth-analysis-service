@@ -3,15 +3,22 @@ from cv2 import imwrite
 
 class Image():
     '''A class containing image processing functions'''
-    def __init__(self, image:ndarray, region_of_interest:list):
+    def __init__(self, image:ndarray, region_of_interest:list, trim_value:float):
 
         self.region_of_interest = region_of_interest
+        self.set_trim_value(trim_value)
 
         self.image = image
         self.trimmed_image = self._trim_min_max(image)
         self.cropped_image = self._crop_image(self.trimmed_image,self.region_of_interest)
-        
-        imwrite("img.png", self.cropped_image)
+
+    def set_trim_value(self,trim_value:float):
+        '''sets the trim value variable used for the removal of background depth data
+        Args:
+            trim_value: a float between 1 and 0
+        '''
+        if trim_value >=1 or trim_value <= 0: raise ValueError(f"Error : trim value of {trim_value} is not valid, value must be between 1 and 0")
+        self.trim_value = trim_value
 
 
     def _trim_min_max(self, image:ndarray)->ndarray:
@@ -32,8 +39,8 @@ class Image():
         image = clip(image, second_min, second_max)
         mask = (image < 10)
         image[mask] = second_max
-
-        mask = (image < median_value * 1.05) & (image > median_value * 0.95)
+        
+        mask = (image < median_value * (1+self.trim_value)) & (image > median_value * (1-self.trim_value))
         image[mask] = 0
 
         return image
