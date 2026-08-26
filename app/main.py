@@ -1,5 +1,6 @@
 from dependencies.mqtt_functions import *
 from dependencies.feature_functions import FeatureExtraction
+from dependencies.image_functions import Image
 
 from dependencies import loadConfig
 import time
@@ -8,12 +9,10 @@ from queue import  Queue
 from mqtt_client import MQTTClient, MQTTConfig
 from json import loads, dumps
 from logging import info
-from base64 import b64decode
-from cv2 import IMREAD_UNCHANGED, imdecode, imwrite
-from numpy import frombuffer, uint8
 #
 MQTT_BROKERS = loadConfig.return_config_value("mqtt_options")
 TOPICS = MQTT_BROKERS["topics"]
+IMAGE_DETAILS = loadConfig.return_config_value("image_options")
 
 def _check_for_triggers(triggers:dict):
     '''Checks the queue for each of the trigger topics and returns the message when any of them have received one
@@ -37,34 +36,30 @@ def _check_for_triggers(triggers:dict):
 
     return message
 
-def _extract_image(encoded_image):
-    '''extracts the image from the encoded array into a ndarray
-    Arga:
-        encoded_image: a string containing the image packet encoded as base64
-    Returns:
-        image: an ndarray containing valid image data
+def _search_database(details:dict, client:MQTTClient):
+    '''sends search command to the broker
+    Args: 
+        details: a dict containing the search details
+        client: the mqtt client used to send the data to the broker
     '''
-    if isinstance(encoded_image, str) and "," in encoded_image:
-        encoded_image = encoded_image.split(",", 1)[1]
-
-    image_bytes = b64decode(encoded_image)
-    depth_image = imdecode(frombuffer(image_bytes, dtype=uint8), IMREAD_UNCHANGED)
-    if depth_image is None:
-        raise ValueError("The image payload could not be decoded by OpenCV.")
-    return depth_image
-
-def worker_process_function(msg, client:MQTTClient):
-    #extract parameters to simplifly search
-    feature_extractor = FeatureExtraction()
-    depth_image = _extract_image(msg["image"])
-    
-    details = feature_extractor.get_subject_details(depth_image)
-    print(f"radius of the plate: {details['radius']}, perimeter of the plate: {details['perimeter']}, depth of the plate: {details['depth']}")
     details["command"] = "search_phrase"
     details["destination"] = "sku_table"
     details["database_name"] = "churchill_database"
+
     for topic in TOPICS:
         if not topic["is_subscribe"]: client.publish(topic["topic"], dumps(details))
+
+def worker_process_function(msg, client:MQTTClient):
+    #extract parameters to simplifly search
+    feature_extractor = FeatureExtraction([7,7])
+
+    image_decoded = extract_image(msg["image"])
+    image = Image(image_decoded, IMAGE_DETAILS["region_of_interest"])
+    depth_image = image.cropped_image
+    
+    details = feature_extractor.get_subject_details(depth_image)
+    print(f"radius of the plate: {details['radius']}, perimeter of the plate: {details['perimeter']}, depth of the plate: {details['depth']}")
+    _search_database(details, client)
     
     #create feature list using ORB
 

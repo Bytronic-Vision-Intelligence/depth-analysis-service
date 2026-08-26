@@ -1,88 +1,88 @@
 from numpy import (
     ndarray, 
     average, 
-    unique, 
-    clip,
-    median
+    dstack
 )
-from cv2 import (
-    findContours, 
-    RETR_TREE, 
-    CHAIN_APPROX_SIMPLE, 
-    Canny, 
-    contourArea, 
-    arcLength,
-    SimpleBlobDetector_create,
-    SimpleBlobDetector_Params,
-    imwrite,
-    drawContours,
-    drawKeypoints,
-    DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS
-)
+import cv2
+from logging import info
 
 class FeatureExtraction():
     '''a simple class handler for feature extraction and image processing'''
+    def __init__(self, blur_value:int = [3,3]):
+        if blur_value[0] % 2 == 0 and blur_value[1] % 2 == 0: 
+            raise ValueError(f"Error : blur values must be odd and more than 1 value of {blur_value} is not valid")
+        self.blur_value = blur_value
+        self.blur_image = None
+        self.binary_image = None
 
-    def _trim_min_max(self, image:ndarray)->ndarray:
-        '''trims the minimum and maximum values of the image provided
-        Args:
-            image: an ndarray representing the image
-        Returns:
-            trimmed_image: an ndarray representing the image with values trimmed'''
-        values = unique(image)
-        median_value = median(image)
-        if values.size < 3:
-            raise ValueError(f"Error : value length of {values.size} is not valid, must be more than 3")
-        
-        second_max = values[-2]
-        second_min = values[1]
-        print(values)
+        pass
 
-        image = clip(image, second_min, second_max)
-        mask = (image < 10)
-        image[mask] = second_max
-
-        mask = (image < median_value * 1.05) & (image > median_value * 0.95)
-        image[mask] = 0
-
-        return image
-
-    def _get_perimeter(self, image:ndarray, threshold:dict) -> float:
+    def _get_perimeter(self, image:ndarray, threshold_value:dict) -> float:
         '''returns the perimeter of the largest contour found in an image
         Args:
             image: an ndarray containing the image
         Returns:
             perimeter: a float representing the length of the largest contour arc
         '''
-        canny_image = Canny(image,threshold["max"],threshold["min"])
+        blur = cv2.blur(image, self.blur_value)
+        ret, thresh = cv2.threshold(blur, 50, 255, cv2.THRESH_BINARY)
+        three_channel_binary = dstack((thresh, thresh, thresh))
 
-        contours, hierachy = findContours(
-            canny_image,
-            RETR_TREE,
-            CHAIN_APPROX_SIMPLE
+        contours, hierachy = cv2.findContours(
+            thresh,
+            cv2.RETR_TREE,
+            cv2.CHAIN_APPROX_SIMPLE
         )
-        largest_contour = max(contours, key = contourArea)
+        if len(contours) ==0:
+            info("INFO : No contour found in image")
+            print("INFO : No contour found in image")
+            return 0
 
-        drawContours(image, largest_contour, -1, 255, 3)
-        imwrite("C:/Users/AmyHarrison/pointcloud_matcher/perimeter.png", image)
+        largest_contour = max(contours, key = cv2.contourArea)
+
+        three_channel_binary = cv2.drawContours(
+            three_channel_binary,
+            [largest_contour],
+            0,
+            128,
+            3
+        )
+
+        cv2.imwrite("perimeter.png", three_channel_binary)
         
-        return arcLength(largest_contour, True)
+        return cv2.arcLength(largest_contour, True)
+
 
     def _get_radius(self, image:ndarray, threshold:dict) -> float:
         '''returns the radius of the largest blob found
         Args:
             image: an ndarray containing the image
         Returns:
-            radius: a float representing the radius of the largest blob'''
+            radius: a float representing the radius of the largest blob
+        '''
         
-        params = SimpleBlobDetector_Params()
+        params = cv2.SimpleBlobDetector_Params()
         params.filterByCircularity = True
         params.minCircularity = 0.1
-        detector = SimpleBlobDetector_create(params)
-        keypoints = detector.detect(image)
+        params.blobColor = 255
+
+        ver = (cv2.__version__).split('.')
+        if int(ver[0]) < 3:
+            detector = cv2.SimpleBlobDetector(params)
+        else:
+            detector = cv2.SimpleBlobDetector_create(params)
+
+        blur = cv2.blur(image, self.blur_value)
+        ret, thresh = cv2.threshold(blur, 50, 255, cv2.THRESH_BINARY)
+        if not ret: return 0
+        
+        keypoints = detector.detect(thresh)
+        if len(keypoints) == 0: return 0
+
         keypoints_sorted = sorted(keypoints, key=lambda k: k.size / 2, reverse=True)
-        drawKeypoints(image, keypoints, image, (0, 255, 0), DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
-        imwrite("C:/Users/AmyHarrison/pointcloud_matcher/radius.png", image)
+        three_channel_binary = dstack((thresh, thresh, thresh))
+        cv2.drawKeypoints(three_channel_binary, keypoints, three_channel_binary, (0, 255, 0), cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
+        cv2.imwrite("radius.png", thresh)
         
         return keypoints_sorted[0].size/2
 
@@ -93,11 +93,11 @@ class FeatureExtraction():
             image: a np.ndarray representing an image
         Returns:
             details: a dictionary containing details of the image'''
+        self.blur_image = cv2.blur(image, self.blur_value)
+        ret, self.binary_image = cv2.threshold(self.blur_image, 50, 255, cv2.THRESH_BINARY)
         
         details = dict()
         single_channel = image if image.ndim == 2 else image[:, :, 0]
-        single_channel = self._trim_min_max(single_channel)
-        imwrite("C:/Users/AmyHarrison/pointcloud_matcher/img.png", single_channel)
         details["depth"] = float(single_channel.max() - single_channel.min())
 
         thresh = {

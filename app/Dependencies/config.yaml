@@ -23,3 +23,6 @@ mqtt_options:
       is_trigger: True
     }
   ]
+
+image_options:
+  region_of_interest: [0,0,2500,3000]
