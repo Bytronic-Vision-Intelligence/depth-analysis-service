@@ -12,13 +12,13 @@ mqtt_options:
     },
     {
       name: "request_cloud_list",
-      topic: "test/dummy_pointcloud/request_cloud",
+      topic: "test/database/search/sku_data",
       is_subscribe: False,
       is_trigger: False
     },
     {
       name: "receive_cloud_list",
-      topic: "test/dummy_pointcloud/receive_cloud_list",
+      topic: "test/database/search/matching_sku",
       is_subscribe: True,
       is_trigger: True
     }

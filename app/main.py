@@ -47,7 +47,9 @@ def _search_database(details:dict, client:MQTTClient):
     details["database_name"] = "churchill_database"
 
     for topic in TOPICS:
-        if not topic["is_subscribe"]: client.publish(topic["topic"], dumps(details))
+        if not topic["is_subscribe"]: 
+            client.publish(topic["topic"], dumps(details))
+            print("string published")
 
 def worker_process_function(msg, client:MQTTClient):
     #extract parameters to simplifly search
@@ -59,7 +61,16 @@ def worker_process_function(msg, client:MQTTClient):
     
     details = feature_extractor.get_subject_details(depth_image)
     print(f"radius of the plate: {details['radius']}, perimeter of the plate: {details['perimeter']}, depth of the plate: {details['depth']}")
+
+
     _search_database(details, client)
+    database_result = {"waiting_for_result": None}
+
+    while image in database_result: 
+        database_result = _check_for_triggers(TOPICS)
+        time.sleep(0.1)
+
+    print(database_result)
     
     #create feature list using ORB
 
@@ -75,7 +86,6 @@ def main():
     client = MQTTClient(config)
     client.connect()
 
-    event_queue = Queue()
     stop_event = threading.Event()
     for topic in TOPICS:
         if not topic["is_subscribe"]:
@@ -94,7 +104,11 @@ def main():
         while True:
             time.sleep(0.1)
             message = _check_for_triggers(TOPICS)
-            if message["image"] is None:
+
+            if "image" in message:
+                if message["image"] is None:
+                    continue
+            else:
                 continue
 
             worker_process_function(message, client)
