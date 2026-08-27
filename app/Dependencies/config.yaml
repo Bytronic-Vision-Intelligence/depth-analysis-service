@@ -27,3 +27,7 @@ mqtt_options:
 image_options:
   region_of_interest: [0,0,2500,3000]
   trim_value: 0.0325
+
+database_options:
+  database_name: "test_database"
+  database_table: "test_table"
