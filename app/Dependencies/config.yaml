@@ -5,7 +5,7 @@ mqtt_options:
 
   topics: [
     {
-      name: "receive_depth_image", 
+      name: "receive_depth_image",
       topic: "test/image/colour_image",
       is_subscribe: True,
       is_trigger: True

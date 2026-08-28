@@ -40,7 +40,6 @@ class FeatureExtraction():
             perimeter: a float representing the length of the largest contour arc
         '''
         largest_contour = self._get_largest_contour()
-        x,y,w,h = cv2.boundingRect(largest_contour)
         
         return cv2.arcLength(largest_contour, True)
 

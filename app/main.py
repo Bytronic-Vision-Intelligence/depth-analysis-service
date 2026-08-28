@@ -77,7 +77,9 @@ def depth_analysis(message:dict):
 
     image_decoded = extract_image(message["image"])
     image = Image(image_decoded, IMAGE_DETAILS["region_of_interest"], IMAGE_DETAILS["trim_value"])
-    depth_image = image.cropped_image[:,:,0]
+    depth_image = image.cropped_image
+    if depth_image.shape[2] > 2:
+        depth_image = depth_image[:,:,0]
     
     details = feature_extractor.get_subject_details(depth_image)
     print(f"radius of the plate: {details['radius']}, perimeter of the plate: {details['perimeter']}, depth of the plate: {details['depth']}")
