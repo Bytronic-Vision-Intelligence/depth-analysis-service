@@ -1,0 +1,20 @@
+# MQTT options ---------------------------------------
+mqtt:
+  mqtt_ip: localhost
+  mqtt_port: 1883
+
+  topics:
+    - name: "receive_depth_image"
+      topic: test/dummy_pointcloud/receive_depth_image
+      is_subscribe: True
+      is_trigger: True
+
+    - name: "request_cloud_list"
+      topic: test/dummy_pointcloud/request_cloud
+      is_subscribe: False
+      is_trigger: False
+
+    - name: "receive_cloud_list"
+      topic: test/dummy_pointcloud/receive_cloud_list
+      is_subscribe: True
+      is_trigger: True
