@@ -152,7 +152,7 @@ def main():
             target = next((t for t in TOPICS if t.get("name") == "receive_hmi_instruction"), None)
             message = _check_for_triggers(target, True)
 
-            send_details(details, client, message["hmi_instruction"])
+            send_details(details, client, message["database_instruction"])
 
     except KeyboardInterrupt:
         print("Shutting down subscribe listener and exiting.")
