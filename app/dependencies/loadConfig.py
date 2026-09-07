@@ -2,8 +2,22 @@ import yaml
 from pathlib import Path
 
 
+_CONFIG_PATH: Path | None = None
+_DEFAULT_CONFIG_PATH = Path(__file__).resolve().parent / "config.yaml"
+_FALLBACK_CONFIG_PATH = Path(__file__).resolve().parent.parent / "configs" / "config.yaml"
+
+
+def set_config_path(path: str | None) -> None:
+    """Set the YAML config path used by get_config / return_config_value.
+    Args:
+        path: path to a config file, or None to use the fallback under app/configs/
+    """
+    global _CONFIG_PATH
+    _CONFIG_PATH = _FALLBACK_CONFIG_PATH if path is None else Path(path)
+
+
 def _config_path() -> Path:
-    return Path(__file__).resolve().parent / "config.yaml"
+    return _CONFIG_PATH if _CONFIG_PATH is not None else _DEFAULT_CONFIG_PATH
 
 
 def get_config() -> dict:

@@ -9,11 +9,12 @@ from queue import  Queue
 from mqtt_client import MQTTClient, MQTTConfig
 from json import loads, dumps
 from logging import info
+import argparse
 #
-MQTT_BROKERS = loadConfig.return_config_value("mqtt_options")
-TOPICS = MQTT_BROKERS["topics"]
-IMAGE_DETAILS = loadConfig.return_config_value("image_options")
-DATABASE_DETAILS = loadConfig.return_config_value("database_options")
+MQTT_BROKERS = None
+TOPICS = None
+IMAGE_DETAILS = None
+DATABASE_DETAILS = None
 
 def _check_for_triggers(trigger:dict, is_blocking:bool=False, timeout:float = 10):
     '''Checks the queue for each of the trigger topics and returns the message when any of them have received one
@@ -116,7 +117,13 @@ def send_details(details:dict, client:MQTTClient, hmi_command:str):
         return False
     return True
 
-def main():
+def main(config_path: str | None = None):
+    global MQTT_BROKERS, TOPICS, DATABASE_DETAILS, IMAGE_DETAILS
+    loadConfig.set_config_path(config_path)
+    MQTT_BROKERS = loadConfig.return_config_value("mqtt")
+    TOPICS = loadConfig.return_config_value("topics")
+    IMAGE_DETAILS = loadConfig.return_config_value("image_options")
+    DATABASE_DETAILS = loadConfig.return_config_value("database_options")
     config = MQTTConfig(host=MQTT_BROKERS["mqtt_ip"], port=MQTT_BROKERS["mqtt_port"])
     client = MQTTClient(config)
     client.connect()
@@ -158,4 +165,24 @@ def main():
         print("Shutting down subscribe listener and exiting.")
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description="Detection analysis service")
+    parser.add_argument(
+        "--config",
+        type=str,
+        default=None,
+        help="Path to YAML config file",
+    )
+    parser.add_argument(
+        "--test",
+        action="store_true",
+        help="Use fallback config (app/configs/config.yaml)",
+    )
+    args = parser.parse_args()
+
+    if args.test and args.config:
+        parser.error("cannot use both --test and --config")
+    if not args.test and not args.config:
+        parser.error("one of --config or --test is required")
+
+    config_path = None if args.test else args.config
+    raise SystemExit(main(config_path=config_path))
