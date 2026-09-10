@@ -1,89 +1,177 @@
-from dependencies.mqtt_functions import *
-from dependencies.feature_functions import FeatureExtraction
-
-from dependencies import loadConfig
 import time
-import threading
-from queue import  Queue
+from json import JSONDecodeError, dumps, loads
+from logging import info, warning
+from queue import Empty, Queue
+from threading import Event
+
+from numpy import asarray
+
 from mqtt_client import MQTTClient, MQTTConfig
-from json import loads
-from logging import info
-#
-MQTT_BROKERS = loadConfig.get_config("mqtt_options")
-TOPICS = loadConfig.get_config("topics")
 
-def _check_for_triggers(triggers:dict):
-    '''Checks the queue for each of the trigger topics and returns the message when any of them have received one
+from dependencies import loadConfig, logging_setup
+from dependencies.feature_functions import FeatureExtraction
+from dependencies.mqtt_functions import start_subscribe_thread
+
+
+def require(config: dict, key: str):
+    """Return a required top-level config value, or exit describing what is missing.
+
     Args:
-        triggers: a dictionary of topics
+        config: the loaded configuration mapping.
+        key: the top-level key the service cannot start without.
     Returns:
-        message: the message received from the trigger as dictionary'''
-    message = {"command": None}
-
-    for trigger in triggers:
+        the value stored under `key`.
+    Raises:
+        SystemExit: when `key` is absent, naming both the key and the file.
+    """
+    # `is None` as well as absent: a key present but empty is a section
+    # somebody meant to fill in, and letting it through moves the failure to
+    # whatever first subscripts it.
+    if key not in config or config[key] is None:
+        # Named only if one has been loaded. require() is also called on
+        # nested sections in contexts that never parsed arguments, and
+        # config_path() refuses to guess there -- which would replace this
+        # message with one about the wrong problem entirely.
         try:
-            if not trigger["is_trigger"]:continue
-        except:
-            continue
+            where = f" in {loadConfig.config_path()}"
+        except SystemExit:
+            where = ""
+        raise SystemExit(f"Missing required config key '{key}'{where}")
+    return config[key]
 
-        try:
-            message = loads(trigger["queue"].get_nowait())
-        except Exception as e:
-            if e != KeyError: info(f"error occured when checking for trigger {e}")
-            continue
 
-    return message
+def start_subscribers(mqtt_config: dict, topics: list, stop_event: Event) -> list:
+    """Start one listener thread per subscribed topic.
 
-def worker_process_function(msg, client:MQTTClient):
-    #extract parameters to simplifly search
-    depth_image = loads(msg)["depth_image"]
-    details = FeatureExtraction.get_subject_details(depth_image)
-    print(f"radius of the plate: {details["radius"]}, perimeter of the plate: {details["perimeter"]}, depth of the plate: {details["depth"]}")
-    details["command"] = "search_phrase"
-    details["destination"] = "sku_table"
-    details["database_name"] = "churchill_database"
-    
-    client.publish(details)
-    #create feature list using ORB
+    Each topic entry with `is_subscribe` true gains a `queue` key, which
+    `next_trigger` later reads from.
 
-    #request a list of skus that match the parameters extracted earlier (seperate subscribe service, 
-    # this is a blocking function, cannot continue until response or timeout)
-
-    #compare the list to the features
-
-    #publish list of matches
-    
-def main():
-    config = MQTTConfig(host=MQTT_BROKERS["mqtt_ip"], port=MQTT_BROKERS["mqtt_port"])
-    client = MQTTClient(config)
-    client.connect()
-
-    event_queue = Queue()
-    stop_event = threading.Event()
-    for topic in TOPICS:
-        if not topic["is_subscribe"]:
+    Args:
+        mqtt_config: the `mqtt` section, carrying mqtt_ip and mqtt_port.
+        topics: configured topic entries; mutated in place to carry queues.
+        stop_event: shared shutdown signal handed to every listener.
+    Returns:
+        threads: the started listener threads.
+    """
+    threads = []
+    for topic in topics:
+        if not topic.get("is_subscribe"):
             continue
         topic["queue"] = Queue()
-        
-        topic["thread"] = start_subscribe_thread(
-            MQTT_BROKERS["mqtt_ip"], 
-            MQTT_BROKERS["mqtt_port"], 
-            topic["topic"], 
-            topic["queue"],
-            stop_event
+        threads.append(
+            start_subscribe_thread(
+                mqtt_config["mqtt_ip"],
+                mqtt_config["mqtt_port"],
+                topic["topic"],
+                topic["queue"],
+                stop_event,
+            )
         )
+    return threads
+
+
+def next_trigger(topics: list):
+    """Poll every trigger queue once and return the first payload waiting.
+
+    Args:
+        topics: configured topic entries, after `start_subscribers` has run.
+    Returns:
+        message: the decoded payload, or None when no trigger is waiting or the
+            payload was not valid JSON.
+    """
+    for topic in topics:
+        if not topic.get("is_trigger") or "queue" not in topic:
+            continue
+        try:
+            payload = topic["queue"].get_nowait()
+        except Empty:
+            continue
+        try:
+            return loads(payload)
+        except (JSONDecodeError, TypeError) as exc:
+            warning(f"Discarding malformed payload on {topic['topic']}: {exc}")
+    return None
+
+
+def output_topics(topics: list) -> list:
+    """Return the topic strings this service publishes to.
+
+    Args:
+        topics: configured topic entries.
+    Returns:
+        the topic strings whose `is_subscribe` flag is false.
+    """
+    return [topic["topic"] for topic in topics if not topic.get("is_subscribe")]
+
+
+def depth_analysis(client: MQTTClient, message: dict, outputs: list, settings: dict) -> None:
+    """Measure the subject in a depth image and publish what was found.
+
+    Every subscribed trigger feeds this, not just the depth image topic, so a
+    message carrying no image is expected rather than exceptional -- the
+    point-cloud list arrives on its own trigger and is not something to measure.
+
+    Args:
+        client: connected MQTT client, for publishing the result.
+        message: the decoded trigger payload.
+        outputs: topic strings this service publishes to.
+        settings: the `service` section, naming the database to search.
+    """
+    image = message.get("depth_image")
+    if image is None:
+        return
+
+    # get_subject_details measures with .max()/.min(), which a JSON array
+    # does not carry. The payload arrives as nested lists whatever produced it.
+    details = FeatureExtraction.get_subject_details(asarray(image))
+    info(f"depth of the subject: {details['depth']}")
+
+    details["command"] = "search_phrase"
+    details["destination"] = settings["database_table"]
+    details["database_name"] = settings["database_name"]
+
+    for topic in outputs:
+        client.publish(topic, dumps(details))
+
+
+def main(argv=None):
+    args = loadConfig.parse_cli(argv)
+
+    config = loadConfig.get_config(args.config)
+
+    log_settings = config.get("logging") or {}
+    logging_setup.configure(log_settings.get("level", logging_setup.DEFAULT_LEVEL))
+
+    mqtt_config = require(config, "mqtt")
+    topics = require(mqtt_config, "topics")
+    settings = require(config, "service")
+
+    client = MQTTClient(
+        MQTTConfig(host=mqtt_config["mqtt_ip"], port=mqtt_config["mqtt_port"]))
+    client.connect()
+
+    outputs = output_topics(topics)
+    stop_event = Event()
+    threads = start_subscribers(mqtt_config, topics, stop_event)
 
     try:
         while True:
             time.sleep(0.1)
-            message = _check_for_triggers(TOPICS)
+
+            message = next_trigger(topics)
             if message is None:
                 continue
 
-            worker_process_function(message)
+            depth_analysis(client, message, outputs, settings)
 
     except KeyboardInterrupt:
-        print("Shutting down subscribe listener and exiting.")
+        info("Shutting down subscribe listener and exiting.")
+    finally:
+        stop_event.set()
+        for thread in threads:
+            if thread.is_alive():
+                thread.join(timeout=2)
+
 
 if __name__ == "__main__":
     main()
