@@ -359,3 +359,30 @@ def test_the_shipped_config_names_a_topic_for_every_name_main_expects():
         (Path(__file__).resolve().parent.parent / "config.example.yaml").read_text())
     names = {topic["name"] for topic in config["mqtt"]["topics"]}
     assert "receive_depth_image" in names
+
+
+def test_the_release_ships_the_config_that_is_tracked():
+    """The workflow copies config.example.yaml into the bundle as config.yaml.
+    Tracking config.yaml instead means service-orchestrator overwrites a
+    tracked file on every sync, and it then shows as modified in a tree
+    somebody is about to commit."""
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parent.parent
+    workflow = (root / ".github/workflows/release-pipeline.yml").read_text(encoding="utf-8")
+
+    assert 'cp config.example.yaml "$output_dir/config.yaml"' in workflow
+    ignored = (root / ".gitignore").read_text().split()
+    assert "/config.yaml" in ignored, "the orchestrator's config.yaml is not ignored"
+
+
+def test_the_repository_does_not_track_a_config_yaml():
+    """A tracked config.yaml in a repository the orchestrator writes into is
+    how a customer's brokers and topics reach a remote."""
+    import subprocess
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parent.parent
+    tracked = subprocess.run(["git", "-C", str(root), "ls-files"],
+                             capture_output=True, text=True).stdout.split()
+    assert "config.yaml" not in tracked
