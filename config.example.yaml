@@ -1,0 +1,97 @@
+# depth-analysis-service: measure the subject in a depth image, then ask the
+# database service to match it or store it.
+#
+# This is the documented SHAPE of a depth-analysis-service configuration, and
+# the copy that ships beside the binary in a release. It is not deployment
+# config: service-orchestrator writes the real one and launches the binary
+# pointed at it with --config, so one binary can serve several installations.
+#
+# Tracked as config.example.yaml, never as config.yaml. The orchestrator writes
+# config.yaml into this directory, and a tracked one would be overwritten by
+# every sync and then show as modified in a tree somebody is about to commit.
+
+# Topic namespace for this installation.
+project: churchill
+
+mqtt:
+  mqtt_ip: localhost
+  mqtt_port: 1883
+  qos: 1
+
+  # Topics are looked up BY NAME, so a deployment can point this service
+  # anywhere but must keep these names. is_subscribe means this service listens
+  # on the topic; the four it reads are resolved at startup, so a renamed entry
+  # refuses to start rather than going quiet later.
+  #
+  # The work runs in this order: a depth image arrives, it is measured, the
+  # operator says what to do with the measurement, and the database answers.
+  topics:
+    - name: receive_depth_image
+      topic: churchill/camera/depth/image
+      is_subscribe: true
+      is_trigger: true
+
+    - name: receive_hmi_instruction
+      topic: churchill/hmi/instruction
+      is_subscribe: true
+      is_trigger: true
+
+    - name: send_depth_analysis
+      topic: churchill/database/search/sku_data
+      is_subscribe: false
+      is_trigger: false
+
+    - name: receive_analysis_results
+      topic: churchill/database/search/matching_sku
+      is_subscribe: true
+      is_trigger: true
+
+    # Declared, not implemented. These were the request/response pair for
+    # pointcloud_functions.py, which reconstructed a point cloud from the
+    # payload, downsampled it and generated a mesh. That module was deleted in
+    # d8340c8 and no code on any branch has referenced these two topics since.
+    #
+    # They are kept here so the intended exchange is not lost: this service was
+    # meant to be able to ask for the list of clouds it should compare against.
+    # Whoever picks that up sets is_subscribe: true on receive_cloud_list and
+    # reads it by name, the way the four above are read.
+    #
+    # is_subscribe stays false in the meantime deliberately. A subscribed topic
+    # gets an unbounded queue that only the code reading it drains, so
+    # subscribing to something nothing reads grows without limit for the life
+    # of the process, silently, the moment anything starts publishing.
+    - name: request_cloud_list
+      topic: churchill/camera/depth/request_cloud
+      is_subscribe: false
+      is_trigger: false
+
+    - name: receive_cloud_list
+      topic: churchill/camera/depth/receive_cloud_list
+      is_subscribe: false
+      is_trigger: false
+
+# Settings belonging to this service alone.
+service:
+  # Left, top, right, bottom. The depth image is cropped to this before
+  # anything is measured.
+  region_of_interest: [0, 0, 2500, 3000]
+  # How far either side of the median counts as background and is zeroed.
+  trim_value: 0.0325
+
+  # Where the measurement is sent to be matched.
+  database_name: churchill_database
+  database_table: sku_table
+
+  # Seconds to wait for the operator's instruction after a measurement, and
+  # for the database's answer after the request. Both were hardcoded: the
+  # first as a 10s block that stopped the service outright when it expired,
+  # the second as a wait with no timeout at all.
+  instruction_timeout: 10
+  database_timeout: 10
+
+# How much this service says. It writes no log files: it prints, the
+# orchestrator forwards every line to project/logging/<service>, and
+# logging-service is the only thing that writes to disk.
+# DEBUG | INFO | WARNING | ERROR | CRITICAL
+logging:
+  level: INFO
