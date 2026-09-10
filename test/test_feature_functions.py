@@ -93,3 +93,10 @@ def test_no_scratch_state_is_kept_between_frames():
 
     for attribute in ("blur_image", "binary_image", "three_channel_binary"):
         assert not hasattr(extractor, attribute)
+
+
+def test_a_tuple_kernel_works_as_well_as_a_list():
+    """main.py hands it a tuple, so that cv2 call has to accept one."""
+    details = FeatureExtraction((7, 7)).get_subject_details(subject())
+
+    assert details["radius"] > 0

@@ -59,6 +59,14 @@ def depth_image_payload(square=200):
     return base64.b64encode(buffer.tobytes()).decode("ascii")
 
 
+def test_the_blur_kernel_cannot_be_mutated_by_a_measurement():
+    """FeatureExtraction stores the kernel it is given. A mutable module-level
+    default would be one object shared by every instance that takes it -- the
+    trap the constructor's own default already had."""
+    with pytest.raises(TypeError):
+        main.BLUR_KERNEL[0] = 3
+
+
 # --- the shared contract -----------------------------------------------------
 
 def test_require_returns_the_value_when_present():

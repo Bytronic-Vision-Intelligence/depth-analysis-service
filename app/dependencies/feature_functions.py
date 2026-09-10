@@ -7,7 +7,7 @@ from numpy import ndarray
 class FeatureExtraction():
     '''a simple class handler for feature extraction and image processing'''
 
-    def __init__(self, blur_value: list = None):
+    def __init__(self, blur_value: tuple | list = None):
         # Was a mutable default. Nothing here writes to it, so it never bit,
         # but a default list is shared by every instance that takes it.
         blur_value = [3, 3] if blur_value is None else blur_value

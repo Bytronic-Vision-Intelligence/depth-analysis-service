@@ -13,7 +13,10 @@ from dependencies.image_functions import Image, extract_image
 from dependencies.mqtt_functions import start_subscribe_thread
 
 #: Blur kernel handed to FeatureExtraction. Both values must be odd.
-BLUR_KERNEL = [7, 7]
+#: A tuple, not a list: FeatureExtraction stores what it is given, so a
+#: mutable module-level default is one object shared by every instance --
+#: the same trap the constructor's own default had.
+BLUR_KERNEL = (7, 7)
 
 #: Used when the config does not say. Both are deliberately not required:
 #: every config written before these existed must still start.
