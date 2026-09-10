@@ -164,9 +164,9 @@ def test_read_with_a_timeout_returns_none_instead_of_raising():
 
 def test_read_with_a_timeout_returns_a_payload_that_arrives():
     topic = {"topic": "t", "queue": Queue()}
-    topic["queue"].put('{"hmi_instruction": "search_database"}')
+    topic["queue"].put('{"database_instruction": "search_database"}')
 
-    assert main.read(topic, timeout=0.5) == {"hmi_instruction": "search_database"}
+    assert main.read(topic, timeout=0.5) == {"database_instruction": "search_database"}
 
 
 def test_read_takes_from_the_topic_it_is_given_and_no_other():
@@ -174,7 +174,7 @@ def test_read_takes_from_the_topic_it_is_given_and_no_other():
     topic must not be consumed by the read that wants an image."""
     topics = subscribed(make_topics())
     instruction = main.topic_named(topics, "receive_hmi_instruction")
-    instruction["queue"].put('{"hmi_instruction": "search_database"}')
+    instruction["queue"].put('{"database_instruction": "search_database"}')
 
     assert main.read(main.topic_named(topics, "receive_depth_image")) is None
     assert instruction["queue"].qsize() == 1
@@ -363,7 +363,7 @@ def test_main_runs_one_measurement_all_the_way_through(monkeypatch):
             "churchill/camera/depth/image":
                 json.dumps({"image": depth_image_payload()}),
             "churchill/hmi/instruction":
-                '{"hmi_instruction": "search_database"}',
+                '{"database_instruction": "search_database"}',
         })
 
     assert len(handled) == 1

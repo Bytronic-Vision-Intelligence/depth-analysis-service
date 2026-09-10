@@ -275,9 +275,9 @@ def main(argv=None):
                         f"discarding this measurement")
                 continue
 
-            requested = instruction.get("hmi_instruction")
+            requested = instruction.get("database_instruction")
             if requested is None:
-                warning("Instruction carried no 'hmi_instruction'; "
+                warning("Instruction carried no 'database_instruction'; "
                         "discarding this measurement")
                 continue
 
