@@ -1,7 +1,8 @@
 # Depth Analysis Service
 
-Measures the subject in a depth image arriving over MQTT and publishes what it
-found, for a database service to match against known parts.
+Measures the subject in a depth image arriving over MQTT, then asks
+database-service to match that measurement against known parts or to store it
+as a new one.
 
 ## Requirements
 
@@ -26,15 +27,26 @@ service, with nothing saying so.
 
 ## What it does
 
-| Step | Where |
-|---|---|
-| poll every trigger queue | `next_trigger` |
-| measure the subject | `depth_analysis` → `FeatureExtraction.get_subject_details` |
-| publish the result | to every topic the config marks `is_subscribe: false` |
+One measurement runs in this order, and each step reads the topic it is
+waiting on by name — never whichever queue happens to have something in it.
 
-A trigger carrying no `depth_image` is ignored rather than treated as an error:
-every subscribed trigger feeds the same loop, and the point-cloud list arrives
-on one of them.
+| Step | Topic | Where |
+|---|---|---|
+| a depth image arrives | `receive_depth_image` | `read` |
+| trim the background and crop | — | `image_functions.Image` |
+| measure depth, perimeter, radius | — | `feature_functions.get_subject_details` |
+| the operator says what to do with it | `receive_hmi_instruction` | `read` |
+| ask the database | `send_depth_analysis` | `send_details` |
+| the database answers | `receive_analysis_results` | `send_details` |
+
+The instruction payload carries `database_instruction`: `search_database`
+searches, anything else adds.
+
+Nothing here takes the service down. A frame it cannot decode, a frame with
+nothing in it, an operator who never answers, a database that never replies, a
+publish the broker refuses — each costs that one measurement and the loop
+carries on. Losing a frame is losing a frame; stopping loses every frame
+after it too.
 
 ## Configuration
 
@@ -48,7 +60,11 @@ and passed with `--config`, so one binary can serve several installations.
 | `project` | topic namespace for this installation |
 | `mqtt.mqtt_ip`, `mqtt.mqtt_port` | the broker |
 | `mqtt.topics` | looked up **by name**; `is_subscribe` decides in or out, `is_trigger` decides what starts work |
-| `service.database_name`, `service.database_table` | what the published result asks to be searched against |
+| `service.region_of_interest` | left, top, right, bottom; the frame is cropped to this before anything is measured |
+| `service.trim_value` | how far either side of the median counts as background and is zeroed |
+| `service.database_name`, `service.database_table` | what the measurement asks to be searched against |
+| `service.instruction_timeout` | seconds to wait for the operator |
+| `service.database_timeout` | seconds to wait for the database |
 | `logging.level` | `DEBUG` \| `INFO` \| `WARNING` \| `ERROR` \| `CRITICAL` |
 
 A required key that is missing, or written and left blank, stops the service at
@@ -84,8 +100,31 @@ release and no error. Keep `prod` current with `main`.
 - `scripts/`, `docker-local/` — release packaging and the local runner
 - `docs/` — documentation and licence
 
-## Not implemented on this branch
+## Declared but not implemented
 
-`FeatureExtraction.get_subject_details` reports `depth` only. Radius and
-perimeter, the point-cloud image decoding and the database round-trip are on
-`churchill-dev`.
+`request_cloud_list` and `receive_cloud_list` are in `config.example.yaml` with
+`is_subscribe: false`. They were the request/response pair for
+`pointcloud_functions.py`, which reconstructed a point cloud from the payload,
+downsampled it and generated a mesh. That module was deleted in `d8340c8` and
+no code on any branch has referenced the topics since.
+
+They are kept so the intended exchange is not lost: this service was meant to
+be able to ask for the list of clouds to compare against. To pick it up, set
+`is_subscribe: true` on `receive_cloud_list` and read it by name the way the
+other four are read.
+
+`is_subscribe` stays false until then on purpose. A subscribed topic gets an
+unbounded queue that only the code reading it drains, so subscribing to
+something nothing reads grows without limit for the life of the process — the
+moment anything starts publishing, and silently.
+
+## Known: the database topics do not line up
+
+This service publishes to `churchill/database/search/sku_data` and listens on
+`churchill/database/search/matching_sku`. database-service subscribes to
+`churchill/db/search/sku_data` and publishes to `churchil/db/search/matching_sku`
+— `database` against `db`, and `churchil` with one L on its side.
+
+So the round trip currently goes nowhere in both directions. Whichever spelling
+wins, both repositories have to agree; this one is a config change on each side,
+not a code change.

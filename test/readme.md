@@ -1,8 +1,10 @@
 # Tests
 
 Pytest, covering config resolution, logging setup, the MQTT subscriber helpers,
-the main loop and the release tooling. No broker is required: `fakes.py`
-supplies stand-ins for the client, config and threads.
+the main loop, the image and measurement stages, and the release tooling. No
+broker is required: `fakes.py` supplies stand-ins for the client, config and
+threads, and the image tests build their own frames with numpy and encode them
+the way a camera would.
 
 ```bash
 python -m pytest
