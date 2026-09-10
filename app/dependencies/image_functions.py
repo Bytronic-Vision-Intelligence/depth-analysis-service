@@ -1,29 +1,26 @@
 from base64 import b64decode
 
 from numpy import ndarray, unique, median, clip, frombuffer, uint8
-from cv2 import imwrite, imdecode, IMREAD_UNCHANGED
+from cv2 import imdecode, IMREAD_UNCHANGED
+
 
 class Image():
     '''A class containing image processing functions'''
-    def __init__(self, image:ndarray, region_of_interest:list, trim_value:float):
-
-        self.region_of_interest = region_of_interest
-        self.set_trim_value(trim_value)
-
-        self.image = image
-        self.trimmed_image = self._trim_min_max(image)
-        self.cropped_image = self._crop_image(self.trimmed_image,self.region_of_interest)
-
-    def set_trim_value(self,trim_value:float):
-        '''sets the trim value variable used for the removal of background depth data
-        Args:
-            trim_value: a float between 1 and 0
-        '''
-        if trim_value >=1 or trim_value <= 0: raise ValueError(f"Error : trim value of {trim_value} is not valid, value must be between 1 and 0")
+    def __init__(self, image: ndarray, region_of_interest: list, trim_value: float):
+        if trim_value >= 1 or trim_value <= 0:
+            raise ValueError(
+                f"Error : trim value of {trim_value} is not valid, value must "
+                f"be between 1 and 0")
         self.trim_value = trim_value
+        self.region_of_interest = region_of_interest
 
+        # Only cropped_image is read. The original and the trimmed stage were
+        # kept as attributes too, which held three arrays per frame where one
+        # is used and nothing ever looked at the other two.
+        trimmed = self._trim_min_max(image)
+        self.cropped_image = self._crop_image(trimmed, region_of_interest)
 
-    def _trim_min_max(self, image:ndarray)->ndarray:
+    def _trim_min_max(self, image: ndarray) -> ndarray:
         '''trims the minimum and maximum values of the image provided
         Args:
             image: an ndarray representing the image
@@ -34,20 +31,20 @@ class Image():
         median_value = median(image)
         if values.size < 3:
             raise ValueError(f"Error : value length of {values.size} is not valid, must be more than 3")
-        
+
         second_max = values[-2]
         second_min = values[1]
 
         image = clip(image, second_min, second_max)
         mask = (image < 10)
         image[mask] = second_max
-        
+
         mask = (image < median_value * (1+self.trim_value)) & (image > median_value * (1-self.trim_value))
         image[mask] = 0
 
         return image
 
-    def _crop_image(self, image:ndarray, region_of_interest:list):
+    def _crop_image(self, image: ndarray, region_of_interest: list):
         '''crops an image to a specified region of interest
         Args:
             image: an ndarray representing the image

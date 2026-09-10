@@ -166,11 +166,13 @@ def depth_analysis(message: dict, settings: dict):
         return None
 
     prepared = Image(image, settings["region_of_interest"], settings["trim_value"])
-    depth_image = prepared.cropped_image
-    if depth_image.ndim > 2 and depth_image.shape[2] > 2:
-        depth_image = depth_image[:, :, 0]
 
-    details = FeatureExtraction(BLUR_KERNEL).get_subject_details(depth_image)
+    details = FeatureExtraction(BLUR_KERNEL).get_subject_details(
+        prepared.cropped_image)
+    if details is None:
+        info("Nothing to measure in this frame")
+        return None
+
     info("Measured radius %s, perimeter %s, depth %s",
          details["radius"], details["perimeter"], details["depth"])
     return details
