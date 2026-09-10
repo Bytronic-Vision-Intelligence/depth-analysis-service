@@ -240,18 +240,21 @@ def main(argv=None):
     inputs = {name: topic_named(topics, name) for name in INPUT_TOPICS}
     topic_named(topics, "send_depth_analysis")
 
+    # Checked here rather than after the listeners start: it is a fact about
+    # the config, and refusing before the broker connection means nothing has
+    # to be unwound.
+    for name, topic in inputs.items():
+        if not topic.get("is_subscribe"):
+            raise SystemExit(
+                f"Topic '{name}' is read by this service but is not subscribed. "
+                f"Set `is_subscribe: true` on it under mqtt.topics.")
+
     client = MQTTClient(
         MQTTConfig(host=mqtt_config["mqtt_ip"], port=mqtt_config["mqtt_port"]))
     client.connect()
 
     stop_event = Event()
     threads = start_subscribers(mqtt_config, topics, stop_event)
-
-    for name, topic in inputs.items():
-        if "queue" not in topic:
-            raise SystemExit(
-                f"Topic '{name}' is read by this service but is not subscribed. "
-                f"Set `is_subscribe: true` on it under mqtt.topics.")
 
     instruction_timeout = settings.get(
         "instruction_timeout", DEFAULT_INSTRUCTION_TIMEOUT)

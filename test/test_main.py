@@ -419,10 +419,8 @@ def test_main_exits_when_a_topic_it_reads_is_not_subscribed(monkeypatch):
         if topic["name"] == "receive_hmi_instruction":
             topic["is_subscribe"] = False
 
-    monkeypatch.setattr(main, "MQTTClient", FakeMQTTClient)
-    monkeypatch.setattr(main, "MQTTConfig", FakeMQTTConfig)
-    monkeypatch.setattr(main, "start_subscribe_thread",
-                        lambda *a, **k: FakeThread())
+    monkeypatch.setattr(main, "MQTTClient",
+                        lambda *a, **k: pytest.fail("connected before refusing"))
     monkeypatch.setattr(main.loadConfig, "get_config",
                         lambda supplied=None: base_config(topics))
 
