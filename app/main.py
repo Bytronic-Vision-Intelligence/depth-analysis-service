@@ -13,6 +13,7 @@ from logging import info
 MQTT_BROKERS = loadConfig.return_config_value("mqtt_options")
 TOPICS = MQTT_BROKERS["topics"]
 IMAGE_DETAILS = loadConfig.return_config_value("image_options")
+DATABASE_DETAILS = loadConfig.return_config_value("database_options")
 
 def _check_for_triggers(triggers:dict):
     '''Checks the queue for each of the trigger topics and returns the message when any of them have received one
@@ -43,11 +44,13 @@ def _search_database(details:dict, client:MQTTClient):
         client: the mqtt client used to send the data to the broker
     '''
     details["command"] = "search_phrase"
-    details["destination"] = "sku_table"
-    details["database_name"] = "churchill_database"
+    details["destination"] = DATABASE_DETAILS["database_table"]
+    details["database_name"] = DATABASE_DETAILS["database_name"]
 
     for topic in TOPICS:
-        if not topic["is_subscribe"]: client.publish(topic["topic"], dumps(details))
+        if not topic["is_subscribe"]: 
+            client.publish(topic["topic"], dumps(details))
+            print("string published")
 
 def worker_process_function(msg, client:MQTTClient):
     #extract parameters to simplifly search
@@ -59,23 +62,25 @@ def worker_process_function(msg, client:MQTTClient):
     
     details = feature_extractor.get_subject_details(depth_image)
     print(f"radius of the plate: {details['radius']}, perimeter of the plate: {details['perimeter']}, depth of the plate: {details['depth']}")
+
+    #database search and response
     _search_database(details, client)
-    
-    #create feature list using ORB
+    database_result = {"waiting_for_result": None}
 
-    #request a list of skus that match the parameters extracted earlier (seperate subscribe service, 
-    # this is a blocking function, cannot continue until response or timeout)
+    while "image" in database_result: 
+        database_result = _check_for_triggers(TOPICS)
+        time.sleep(0.1)
 
-    #compare the list to the features
+    if not "radius" in database_result:
+        info("Error: no match found in database")
+        print("Error: no match found in database")
+        return
 
-    #publish list of matches
-    
 def main():
     config = MQTTConfig(host=MQTT_BROKERS["mqtt_ip"], port=MQTT_BROKERS["mqtt_port"])
     client = MQTTClient(config)
     client.connect()
 
-    event_queue = Queue()
     stop_event = threading.Event()
     for topic in TOPICS:
         if not topic["is_subscribe"]:
@@ -94,7 +99,11 @@ def main():
         while True:
             time.sleep(0.1)
             message = _check_for_triggers(TOPICS)
-            if message["image"] is None:
+
+            if "image" in message:
+                if message["image"] is None:
+                    continue
+            else:
                 continue
 
             worker_process_function(message, client)
