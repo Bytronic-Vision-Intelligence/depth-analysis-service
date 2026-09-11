@@ -43,5 +43,7 @@ def extract_image(encoded_image):
     image_bytes = b64decode(encoded_image)
     depth_image = imdecode(frombuffer(image_bytes, dtype=uint8), IMREAD_UNCHANGED)
     if depth_image is None:
-        raise ValueError("The image payload could not be decoded by OpenCV.")
+        raise ValueError("Error : The image payload could not be decoded by OpenCV.")
+    if not len(depth_image.shape) > 2:
+        raise ValueError("Error : image not valid shape")
     return depth_image

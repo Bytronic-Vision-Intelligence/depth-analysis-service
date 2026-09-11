@@ -5,19 +5,25 @@ mqtt_options:
 
   topics: [
     {
-      name: "receive_depth_image", 
+      name: "receive_depth_image",
       topic: "test/image/colour_image",
       is_subscribe: True,
       is_trigger: True
     },
     {
-      name: "request_cloud_list",
+      name: "receive_hmi_instruction", 
+      topic: "test/hmi/instruction",
+      is_subscribe: True,
+      is_trigger: True
+    },
+    {
+      name: "send_depth_analysis",
       topic: "test/database/search/sku_data",
       is_subscribe: False,
       is_trigger: False
     },
     {
-      name: "receive_cloud_list",
+      name: "receive_analysis_results",
       topic: "test/database/search/matching_sku",
       is_subscribe: True,
       is_trigger: True
