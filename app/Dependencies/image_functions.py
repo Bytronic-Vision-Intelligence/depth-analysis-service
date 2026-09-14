@@ -20,7 +20,6 @@ class Image():
         if trim_value >=1 or trim_value <= 0: raise ValueError(f"Error : trim value of {trim_value} is not valid, value must be between 1 and 0")
         self.trim_value = trim_value
 
-
     def _trim_min_max(self, image:ndarray)->ndarray:
         '''trims the minimum and maximum values of the image provided
         Args:

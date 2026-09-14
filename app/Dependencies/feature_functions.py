@@ -72,7 +72,6 @@ class FeatureExtraction():
             "min": average(single_channel) - average(single_channel)/2,
             "max": average(single_channel) + average(single_channel)/2
         }
-        
         details["perimeter"] = self._get_perimeter()
         details["radius"] = self._get_radius()
         return details

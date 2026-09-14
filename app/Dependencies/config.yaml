@@ -18,7 +18,7 @@ mqtt_options:
     },
     {
       name: "send_depth_analysis",
-      topic: "test/database/search/sku_data",
+      topic: "test/depth_analysts/search/sku_data",
       is_subscribe: False,
       is_trigger: False
     },
