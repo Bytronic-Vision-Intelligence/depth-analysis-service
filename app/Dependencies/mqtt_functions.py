@@ -2,8 +2,11 @@ from mqtt_client import MQTTClient, MQTTConfig
 import threading
 from base64 import b64decode
 from cv2 import IMREAD_UNCHANGED, imdecode
-from numpy import frombuffer, uint8
+from numpy import frombuffer, uint8, asarray, nan, float32, ndarray
 from queue import Queue
+
+RAW_PNG_MM_SCALE=100.00
+BIT_SCALE_15=32768.0
 
 def subscribe_listener(ip: str, port: int, trigger_topic: str, result_queue: Queue, stop_event: threading.Event):
     config = MQTTConfig(host=ip, port=port)
@@ -42,8 +45,18 @@ def extract_image(encoded_image):
 
     image_bytes = b64decode(encoded_image)
     depth_image = imdecode(frombuffer(image_bytes, dtype=uint8), IMREAD_UNCHANGED)
+
     if depth_image is None:
         raise ValueError("Error : The image payload could not be decoded by OpenCV.")
-    if not len(depth_image.shape) == 0 and not len(depth_image.shape) == 3:
-        raise ValueError("Error : image not valid shape")
+    if len(depth_image.shape) == 2:
+        decode_raw_height_png(depth_image)
     return depth_image
+
+def decode_raw_height_png(image: ndarray) -> ndarray:
+    """Decode a raw height PNG (from :func:`prepare_raw_png` float path) to mm."""
+    arr = asarray(image)
+    if arr.ndim == 3 and arr.shape[2] == 1:
+        arr = arr[:, :, 0]
+    mm = (arr.astype(float32) - BIT_SCALE_15) / float32(RAW_PNG_MM_SCALE)
+    mm[arr == 0] = nan
+    return mm
