@@ -49,7 +49,7 @@ def extract_image(encoded_image):
     if depth_image is None:
         raise ValueError("Error : The image payload could not be decoded by OpenCV.")
     if len(depth_image.shape) == 2:
-        decode_raw_height_png(depth_image)
+        depth_image=decode_raw_height_png(depth_image)
     return depth_image
 
 def decode_raw_height_png(image: ndarray) -> ndarray:
