@@ -7,8 +7,7 @@ import time
 import threading
 from queue import  Queue
 from mqtt_client import MQTTClient, MQTTConfig
-from json import loads, dumps
-from logging import info
+from numpy import unique
 #
 MQTT_BROKERS = loadConfig.return_config_value("broker_details")
 TOPICS = MQTT_BROKERS["topics"]
@@ -29,6 +28,8 @@ def depth_analysis(message:dict):
     feature_extractor = FeatureExtraction([7,7])
 
     image_decoded = extract_image(message["image"])
+    pixel_range = len(unique(image_decoded))
+    if pixel_range == 1: return False
     image = Image(image_decoded, IMAGE_DETAILS["region_of_interest"], IMAGE_DETAILS["trim_value"])
     depth_image = image.cropped_image
     if depth_image.shape[2] > 2:
@@ -39,6 +40,10 @@ def depth_analysis(message:dict):
     return details
 
 def main():
+    config = loadConfig.get_config()
+    service_id = config.get("service_id", "depth_analysis_1")
+
+    print(f"INFO : {service_id} starting \n\r")
     config = MQTTConfig(host=MQTT_BROKERS["mqtt_ip"], port=MQTT_BROKERS["mqtt_port"])
     client = MQTTClient(config)
     client.connect()
@@ -70,6 +75,7 @@ def main():
                 continue
 
             details = depth_analysis(message)
+            if details == False: continue
 
             target = next((t for t in TOPICS if t.get("name") == "receive_hmi_instruction"), None)
             message = check_for_triggers(target, True)
@@ -77,7 +83,7 @@ def main():
             send_details(details, client, message["database_instruction"])
 
     except KeyboardInterrupt:
-        print("Shutting down subscribe listener and exiting.")
+        print(f"Info: {service_id} Shutting down subscribe listener and exiting.")
 
 if __name__ == "__main__":
     main()

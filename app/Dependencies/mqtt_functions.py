@@ -1,7 +1,7 @@
 from mqtt_client import MQTTClient, MQTTConfig
 import threading
 from base64 import b64decode
-from cv2 import IMREAD_UNCHANGED, imdecode
+from cv2 import IMREAD_UNCHANGED, imdecode, imwrite
 from numpy import frombuffer, uint8, asarray, nan, float32, ndarray
 from queue import Queue
 from json import loads
@@ -54,11 +54,11 @@ def extract_image(encoded_image):
 
     image_bytes = b64decode(encoded_image)
     depth_image = imdecode(frombuffer(image_bytes, dtype=uint8), IMREAD_UNCHANGED)
-
+    status = imwrite('message_image.png', depth_image)
     if depth_image is None:
         raise ValueError("Error : The image payload could not be decoded by OpenCV.")
-    if len(depth_image.shape) == 2:
-        depth_image=decode_raw_height_png(depth_image)
+    # if len(depth_image.shape) == 2:
+    #     depth_image=decode_raw_height_png(depth_image)
     return depth_image
 
 def decode_raw_height_png(image: ndarray) -> ndarray:
