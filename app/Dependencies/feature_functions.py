@@ -1,7 +1,8 @@
 from numpy import (
     ndarray, 
     average, 
-    dstack
+    dstack,
+    unique
 )
 import cv2
 from logging import info
@@ -22,8 +23,11 @@ class FeatureExtraction():
         '''finds the largest contour in an image and returns it
         Returns:
             largetst_contour: the largest contour by area'''
+        image = self.binary_image
+        values = unique(image)
+        b = cv2.imwrite("contour_image.png", image)
         contours, hierachy = cv2.findContours(
-            self.binary_image,
+            image,
             cv2.RETR_TREE,
             cv2.CHAIN_APPROX_SIMPLE
         )

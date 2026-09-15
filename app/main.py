@@ -27,12 +27,12 @@ def depth_analysis(message:dict):
     
     feature_extractor = FeatureExtraction([7,7])
 
-    image_decoded = extract_image(message["image"])
+    image_decoded = decode_image_from_bytes(extract_image(message["image"]))
     pixel_range = len(unique(image_decoded))
     if pixel_range == 1: return False
     image = Image(image_decoded, IMAGE_DETAILS["region_of_interest"], IMAGE_DETAILS["trim_value"])
     depth_image = image.cropped_image
-    if depth_image.shape[2] > 2:
+    if len(depth_image.shape) > 2:
         depth_image = depth_image[:,:,0]
     
     details = feature_extractor.get_subject_details(depth_image)
@@ -80,7 +80,13 @@ def main():
             target = next((t for t in TOPICS if t.get("name") == "receive_hmi_instruction"), None)
             message = check_for_triggers(target, True)
 
-            send_details(details, client, message["database_instruction"])
+            send_details(
+                details, 
+                client, 
+                message["database_instruction"], 
+                DATABASE_DETAILS, 
+                TOPICS
+            )
 
     except KeyboardInterrupt:
         print(f"Info: {service_id} Shutting down subscribe listener and exiting.")
