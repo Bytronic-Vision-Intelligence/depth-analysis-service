@@ -1,0 +1,30 @@
+broker_details:
+  mqtt_ip: localhost
+  mqtt_port: 1883
+  topics:
+  - name: receive_depth_image
+    topic: churchill/camera/depth_1/image
+    is_subscribe: true
+    is_trigger: true
+  - name: receive_hmi_instruction
+    topic: churchill/ui/ui_1/instruction
+    is_subscribe: true
+    is_trigger: true
+  - name: send_depth_analysis
+    topic: churchill/depth_analysis/search/sku_data
+    is_subscribe: false
+    is_trigger: false
+  - name: receive_analysis_results
+    topic: churchill/database/search/matching_sku
+    is_subscribe: true
+    is_trigger: true
+image_options:
+  region_of_interest:
+  - 0
+  - 0
+  - 2500
+  - 3000
+  trim_value: 0.0325
+database_options:
+  database_name: test_database
+  database_table: test_table

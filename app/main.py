@@ -10,12 +10,12 @@ from mqtt_client import MQTTClient, MQTTConfig
 from json import loads, dumps
 from logging import info
 #
-MQTT_BROKERS = loadConfig.return_config_value("mqtt_options")
+MQTT_BROKERS = loadConfig.return_config_value("broker_details")
 TOPICS = MQTT_BROKERS["topics"]
 IMAGE_DETAILS = loadConfig.return_config_value("image_options")
 DATABASE_DETAILS = loadConfig.return_config_value("database_options")
 
-def _check_for_triggers(trigger:dict, is_blocking:bool=False, timeout:float = 10):
+def _check_for_triggers(trigger:dict, is_blocking:bool=False, timeout:float = 1000):
     '''Checks the queue for each of the trigger topics and returns the message when any of them have received one
     Args:
         triggers: a dictionary of topics

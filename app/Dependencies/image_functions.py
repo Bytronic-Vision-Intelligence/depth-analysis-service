@@ -53,5 +53,5 @@ class Image():
             cropped_image: an ndarray representing the cropped image
         '''
         cropped_image = image[region_of_interest[1]:region_of_interest[3], region_of_interest[0]: region_of_interest[2]]
-        print(cropped_image)
+        # print(cropped_image)
         return cropped_image
