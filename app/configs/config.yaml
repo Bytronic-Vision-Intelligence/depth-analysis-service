@@ -3,11 +3,7 @@ broker_details:
   mqtt_port: 1883
   topics:
   - name: receive_depth_image
-    topic: churchill/camera/depth_1/image
-    is_subscribe: true
-    is_trigger: true
-  - name: receive_hmi_instruction
-    topic: churchill/ui/ui_1/instruction
+    topic: test/camera/colour_image
     is_subscribe: true
     is_trigger: true
   - name: send_depth_analysis
@@ -25,6 +21,3 @@ image_options:
   - 2500
   - 3000
   trim_value: 0.0325
-database_options:
-  database_name: test_database
-  database_table: test_table

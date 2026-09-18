@@ -13,7 +13,6 @@ from logging import info
 MQTT_BROKERS = loadConfig.return_config_value("broker_details")
 TOPICS = MQTT_BROKERS["topics"]
 IMAGE_DETAILS = loadConfig.return_config_value("image_options")
-DATABASE_DETAILS = loadConfig.return_config_value("database_options")
 
 def depth_analysis(message:dict):
     '''The depth analysis worker captures depth data from a pointcloud image and extracts the radius, perimeter and depth of the subject

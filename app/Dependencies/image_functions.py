@@ -29,6 +29,7 @@ class Image():
         '''
         values = unique(image)
         median_value = median(image)
+        status = imwrite('output_grey.png', image)
         if values.size < 3:
             raise ValueError(f"Error : value length of {values.size} is not valid, must be more than 3")
         
