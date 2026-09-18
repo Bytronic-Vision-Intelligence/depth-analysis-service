@@ -82,8 +82,7 @@ def main():
             send_details(
                 details, 
                 client, 
-                message["database_instruction"], 
-                DATABASE_DETAILS, 
+                message["database_instruction"],
                 TOPICS
             )
 
