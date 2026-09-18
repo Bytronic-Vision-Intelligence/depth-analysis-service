@@ -1,11 +1,11 @@
 from dependencies.mqtt_functions import *
 from dependencies.feature_functions import FeatureExtraction
 from dependencies.image_functions import Image
+from dependencies.image_functions import decode_image_from_bytes, extract_image
 
 from dependencies import loadConfig
 import time
 import threading
-from queue import  Queue
 from mqtt_client import MQTTClient, MQTTConfig
 from numpy import unique
 #
@@ -41,7 +41,6 @@ def depth_analysis(message:dict):
 def main():
     config = loadConfig.get_config()
     service_id = config.get("service_id", "depth_analysis_1")
-
     topics = TOPICS
 
     print(f"INFO : {service_id} starting \n\r")
@@ -50,12 +49,12 @@ def main():
     client.connect()
 
     topics = create_topic_listners(MQTT_BROKERS, topics)
-
+    target_topic = next((t for t in topics if t.get("name") == "receive_depth_image"), None)
+    instruction_topic = next((t for t in topics if t.get("name") == "receive_hmi_instruction"), None)
     try:
         while True:
             time.sleep(0.1)
-            target = next((t for t in topics if t.get("name") == "receive_depth_image"), None)
-            message = check_for_triggers(target)
+            message = check_for_triggers(target_topic)
 
             if "image" in message:
                 if message["image"] is None:
@@ -66,8 +65,7 @@ def main():
             details = depth_analysis(message)
             if details == False: continue
 
-            target = next((t for t in topics if t.get("name") == "receive_hmi_instruction"), None)
-            message = check_for_triggers(target, True)
+            message = check_for_triggers(instruction_topic, True)
 
             send_details(
                 details, 
