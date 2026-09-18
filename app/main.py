@@ -42,29 +42,19 @@ def main():
     config = loadConfig.get_config()
     service_id = config.get("service_id", "depth_analysis_1")
 
+    topics = TOPICS
+
     print(f"INFO : {service_id} starting \n\r")
     config = MQTTConfig(host=MQTT_BROKERS["mqtt_ip"], port=MQTT_BROKERS["mqtt_port"])
     client = MQTTClient(config)
     client.connect()
 
-    stop_event = threading.Event()
-    for topic in TOPICS:
-        if not topic["is_subscribe"]:
-            continue
-        topic["queue"] = Queue()
-        
-        topic["thread"] = start_subscribe_thread(
-            MQTT_BROKERS["mqtt_ip"], 
-            MQTT_BROKERS["mqtt_port"], 
-            topic["topic"], 
-            topic["queue"],
-            stop_event
-        )
+    topics = create_topic_listners(MQTT_BROKERS, topics)
 
     try:
         while True:
             time.sleep(0.1)
-            target = next((t for t in TOPICS if t.get("name") == "receive_depth_image"), None)
+            target = next((t for t in topics if t.get("name") == "receive_depth_image"), None)
             message = check_for_triggers(target)
 
             if "image" in message:
@@ -76,14 +66,14 @@ def main():
             details = depth_analysis(message)
             if details == False: continue
 
-            target = next((t for t in TOPICS if t.get("name") == "receive_hmi_instruction"), None)
+            target = next((t for t in topics if t.get("name") == "receive_hmi_instruction"), None)
             message = check_for_triggers(target, True)
 
             send_details(
                 details, 
                 client, 
                 message["database_instruction"],
-                TOPICS
+                topics
             )
 
     except KeyboardInterrupt:
