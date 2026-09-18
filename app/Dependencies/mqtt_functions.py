@@ -1,11 +1,12 @@
 from mqtt_client import MQTTClient, MQTTConfig
 import threading
 from base64 import b64decode
-from cv2 import IMREAD_UNCHANGED, imdecode
-from numpy import frombuffer, uint8, asarray, nan, float32, ndarray
+from cv2 import IMREAD_UNCHANGED, imdecode, imwrite, imencode, convertScaleAbs
+from numpy import frombuffer, uint8, asarray, nan, float32, ndarray, uint16
 from queue import Queue
-from json import loads
+from json import loads, dumps
 from logging import info
+from time import sleep
 
 RAW_PNG_MM_SCALE=100.00
 BIT_SCALE_15=32768.0
@@ -42,6 +43,15 @@ def start_subscribe_thread(
     thread.start()
     return thread
 
+def encode_image_to_bytes(image: ndarray) -> bytes:
+    """Encode the image as JPEG (8-bit) or PNG (uint16)."""
+    if image.dtype == uint16:
+        success, encoded_image = imencode(".png", image)
+        if not success:
+            raise RuntimeError("Failed to encode image to PNG format.")
+        return encoded_image.tobytes()
+
+
 def extract_image(encoded_image):
     '''extracts the image from the encoded array into a ndarray
     Arga:
@@ -53,13 +63,32 @@ def extract_image(encoded_image):
         encoded_image = encoded_image.split(",", 1)[1]
 
     image_bytes = b64decode(encoded_image)
-    depth_image = imdecode(frombuffer(image_bytes, dtype=uint8), IMREAD_UNCHANGED)
-
+    depth_image = imdecode(frombuffer(image_bytes, dtype=uint16), IMREAD_UNCHANGED)
+    status = imwrite('message_image.png', depth_image)
     if depth_image is None:
         raise ValueError("Error : The image payload could not be decoded by OpenCV.")
-    if len(depth_image.shape) == 2:
-        depth_image=decode_raw_height_png(depth_image)
     return depth_image
+
+def extract_image(encoded_image: str) -> bytes:
+    """Decode base64 image bytes from a camera packet."""
+    encoded = str(encoded_image).strip()
+    if encoded.lower().startswith("data:") and "," in encoded:
+        encoded = encoded.split(",", 1)[1]
+    encoded = "".join(encoded.split())
+    padding = (-len(encoded)) % 4
+    if padding:
+        encoded += "=" * padding
+    return b64decode(encoded, validate=False)
+
+def decode_image_from_bytes(data: bytes) -> ndarray:
+    """Decode image bytes into an ndarray."""
+    if not data:
+        raise ValueError("Empty image bytes.")
+
+    image = imdecode(frombuffer(data, uint8), IMREAD_UNCHANGED).astype('uint8')
+    if image is None:
+        raise ValueError("Could not decode image bytes.")
+    return image
 
 def decode_raw_height_png(image: ndarray) -> ndarray:
     """Decode a raw height PNG (from :func:`prepare_raw_png` float path) to mm."""
@@ -94,7 +123,13 @@ def check_for_triggers(trigger:dict, is_blocking:bool=False, timeout:float = 10)
 
     return message
 
-def send_details(details:dict, client:MQTTClient, hmi_command:str):
+def send_details(
+        details:dict, 
+        client:MQTTClient, 
+        hmi_command:str, 
+        database_details:dict, 
+        topics:dict
+    ):
     '''sends extracted details to an mqtt broker with an appropriate command and awaits a response
     Args:
         details: a dict containing the details to be sent to the database, radius:float, perimeter:float, depth:float
@@ -111,13 +146,13 @@ def send_details(details:dict, client:MQTTClient, hmi_command:str):
         raise ValueError("Error : hmi_command cannot be empty")
 
     is_search = hmi_command == "search_database"
-    _message_database(is_search, details, client)
+    _message_database(is_search, details, client, database_details, topics)
     database_result = {"waiting_for_result": None}
 
-    target = next((t for t in TOPICS if t.get("name") == "receive_analysis_results"), None)
+    target = next((t for t in topics if t.get("name") == "receive_analysis_results"), None)
     while "image" in database_result: 
         database_result = check_for_triggers(target)
-        time.sleep(0.1)
+        sleep(0.1)
 
     if not "radius" in database_result:
         info("Error: no match found in database")
