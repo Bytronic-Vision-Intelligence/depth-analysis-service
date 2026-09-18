@@ -3,7 +3,7 @@ from pathlib import Path
 
 
 def _config_path() -> Path:
-    return Path(__file__).resolve().parent / "config.yaml"
+    return Path(__file__).resolve().parent.parent / "configs" / "config.yaml"
 
 
 def get_config() -> dict:
