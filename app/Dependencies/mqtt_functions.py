@@ -201,18 +201,6 @@ def send_details(
         raise ConnectionError("Error : client is not connected")
 
     _message_database(details, client, topics)
-    database_result = {"waiting_for_result": None}
-
-    target = next((t for t in topics if t.get("name") == "receive_analysis_results"), None)
-    while "image" in database_result: 
-        database_result = check_for_triggers(target)
-        sleep(0.1)
-
-    if not "radius" in database_result:
-        info("Error: no match found in database")
-        print("Error: no match found in database")
-        return False
-    return True
 
 def _message_database(
         details:dict, 
