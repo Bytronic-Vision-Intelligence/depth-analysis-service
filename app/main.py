@@ -5,6 +5,7 @@ from dependencies.image_functions import decode_image_from_bytes, extract_image
 
 from dependencies import loadConfig
 import time
+import datetime
 import threading
 from mqtt_client import MQTTClient, MQTTConfig
 from numpy import unique
@@ -35,7 +36,6 @@ def depth_analysis(message:dict):
         depth_image = depth_image[:,:,0]
     
     details = feature_extractor.get_subject_details(depth_image)
-    print(f"radius of the plate: {details['radius']}, perimeter of the plate: {details['perimeter']}, depth of the plate: {details['depth']}")
     return details
 
 def main():
@@ -50,7 +50,6 @@ def main():
 
     topics = create_topic_listners(MQTT_BROKERS, topics)
     target_topic = next((t for t in topics if t.get("name") == "receive_depth_image"), None)
-    instruction_topic = next((t for t in topics if t.get("name") == "receive_hmi_instruction"), None)
     try:
         while True:
             time.sleep(0.1)
@@ -61,16 +60,14 @@ def main():
                     continue
             else:
                 continue
-
+            print(time.localtime())
             details = depth_analysis(message)
+        
             if details == False: continue
-
-            message = check_for_triggers(instruction_topic, True)
 
             send_details(
                 details, 
-                client, 
-                message["database_instruction"],
+                client,
                 topics
             )
 

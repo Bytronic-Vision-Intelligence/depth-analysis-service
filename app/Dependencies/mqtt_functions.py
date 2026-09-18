@@ -26,7 +26,6 @@ def subscribe_listener(ip: str, port: int, trigger_topic: str, result_queue: Que
 
     client.subscribe(trigger_topic, _on_message)
 
-
 def start_subscribe_thread(ip: str, port: int, topic: str, queue: Queue, stop_event: threading.Event) -> threading.Thread:
     """Run `subscribe_listener` on a daemon thread.
 
@@ -126,37 +125,6 @@ def packetize_results(root_message:any, results:dict, results_map:list[str], top
         packet_number+=1
         packet_list.append(packet)
     return packet_list
-
-def check_trigger(trigger:dict, is_blocking:bool=False, timeout:float = 10):
-    '''Checks the queue for each of the trigger topics and returns the message when any of them have received one
-
-    Args:
-        triggers: a dictionary of topics
-        is_blocking: a boolean value that controls the blocking functionality
-        timout: a float that determines the timout in s
-    Returns:
-        message: the message received from the trigger as dictionary'''
-
-    if not trigger:
-        raise ValueError("Error : trigger cannot be empty")
-    
-    message = dict()
-
-    if is_blocking:
-        message = loads(trigger["queue"].get(timeout=timeout))
-        return message
-    
-    if not "queue" in trigger: return message
-
-    try:
-        message = loads(trigger["queue"].get_nowait())
-    except (JSONDecodeError, TypeError) as exc:
-        info(f"Discarding malformed payload on {trigger['topic']}: {exc}")
-        info(f"Discarding malformed payload on {trigger['topic']}: {exc}")
-    except:
-        return message
-
-    return message
 
 def check_for_triggers(trigger:dict, is_blocking:bool=False, timeout:float = 10):
     '''Checks the queue for each of the trigger topics and returns the message when any of them have received one

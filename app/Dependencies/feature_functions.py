@@ -25,7 +25,6 @@ class FeatureExtraction():
             largetst_contour: the largest contour by area'''
         image = self.binary_image
         values = unique(image)
-        b = cv2.imwrite("contour_image.png", image)
         contours, hierachy = cv2.findContours(
             image,
             cv2.RETR_TREE,
@@ -33,7 +32,6 @@ class FeatureExtraction():
         )
         if len(contours) ==0:
             info("INFO : No contour found in image")
-            print("INFO : No contour found in image")
             return 0
         
         return max(contours, key = cv2.contourArea)

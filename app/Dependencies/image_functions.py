@@ -1,8 +1,8 @@
-from numpy import ndarray, unique, median, clip
-from cv2 import imwrite
+from numpy import ndarray, unique, median, clip, vstack
 from base64 import b64decode
-from cv2 import IMREAD_UNCHANGED, imdecode, imwrite, imencode, convertScaleAbs
+from cv2 import IMREAD_UNCHANGED, imdecode, imencode
 from numpy import frombuffer, uint8, asarray, nan, float32, ndarray, uint16
+from multiprocessing import Pool
 RAW_PNG_MM_SCALE=100.00
 BIT_SCALE_15=32768.0
 
@@ -14,8 +14,8 @@ class Image():
         self.set_trim_value(trim_value)
 
         self.image = image
-        self.trimmed_image = self._trim_min_max(image)
-        self.cropped_image = self._crop_image(self.trimmed_image,self.region_of_interest)
+        self.cropped_image = self._crop_image(image,self.region_of_interest)
+        self.trimmed_image = self._trim_min_max(self.cropped_image)
 
     def set_trim_value(self,trim_value:float):
         '''sets the trim value variable used for the removal of background depth data
@@ -32,20 +32,27 @@ class Image():
         Returns:
             trimmed_image: an ndarray representing the image with values trimmed
         '''
+        
         values = unique(image)
-        median_value = median(image)
-        status = imwrite('output_grey.png', image)
         if values.size < 3:
             raise ValueError(f"Error : value length of {values.size} is not valid, must be more than 3")
-        
+        median_value = median(image)
         second_max = values[-2]
         second_min = values[1]
 
-        image = clip(image, second_min, second_max)
+        clip(image, second_min, second_max, out=image)
         mask = (image < 10)
+
+        low_threshold = median_value * (1 - self.trim_value)
+        high_threshold = median_value * (1 + self.trim_value)
         image[mask] = second_max
         
-        mask = (image < median_value * (1+self.trim_value)) & (image > median_value * (1-self.trim_value))
+        mask = (
+            (image < median_value) & 
+            (image > high_threshold) &
+            (image > low_threshold)
+        )
+        image [image<10] = second_max
         image[mask] = 0
 
         return image
@@ -61,6 +68,46 @@ class Image():
         cropped_image = image[region_of_interest[1]:region_of_interest[3], region_of_interest[0]: region_of_interest[2]]
         # print(cropped_image)
         return cropped_image
+
+    def unstitch_image(self, image1:ndarray, num_pieces: int = 4) -> list:
+            """
+            A helper function that splits an image into several smaller images and returns them as a list.
+            this function is used to create smaller images for running in parallel for faster processing.
+            Args:
+                image1 (numpy.ndarray): The input image to be unstitched.
+                num_pieces (int): The number of pieces to split the image into (default is 4).
+            Returns:
+                list: A list of smaller images.
+            """
+            height, width, channels = image1.shape
+            piece_height = height // num_pieces
+            pieces = []
+            for i in range(num_pieces):
+                start_row = i * piece_height
+                end_row = (i + 1) * piece_height if i < num_pieces - 1 else height
+                pieces.append(image1[start_row:end_row, :, :])
+            return pieces
+
+    def stitch_image(self, pieces: list) -> ndarray:
+            """
+            A helper function that stitches a list of smaller images back into a single image.
+            this function is used to combine the smaller images processed in parallel back into a single image.
+            Args:
+                pieces (list): A list of smaller images to be stitched together.
+            Returns:
+                numpy.ndarray: The stitched image.
+            """
+            return vstack(pieces)
+
+    def _trim_min_max_multiprocessed(self, image):
+        '''applies a fucntion to an image pool and then returns the results
+        '''
+        image_pool = self.unstitch_image(image)
+
+        with Pool(processes=len(image_pool)) as pool:
+            results = pool.map(self._trim_min_max, image_pool)
+
+        return self.stitch_image(results)
 
 def encode_image_to_bytes(image: ndarray) -> bytes:
     """Encode the image as JPEG (8-bit) or PNG (uint16)."""
@@ -82,7 +129,6 @@ def extract_image(encoded_image):
 
     image_bytes = b64decode(encoded_image)
     depth_image = imdecode(frombuffer(image_bytes, dtype=uint16), IMREAD_UNCHANGED)
-    status = imwrite('message_image.png', depth_image)
     if depth_image is None:
         raise ValueError("Error : The image payload could not be decoded by OpenCV.")
     return depth_image
