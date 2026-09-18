@@ -3,6 +3,7 @@ from base64 import b64decode
 from cv2 import IMREAD_UNCHANGED, imdecode, imencode
 from numpy import frombuffer, uint8, asarray, nan, float32, ndarray, uint16
 from multiprocessing import Pool
+from logging import info
 RAW_PNG_MM_SCALE=100.00
 BIT_SCALE_15=32768.0
 
@@ -66,7 +67,7 @@ class Image():
             cropped_image: an ndarray representing the cropped image
         '''
         cropped_image = image[region_of_interest[1]:region_of_interest[3], region_of_interest[0]: region_of_interest[2]]
-        # print(cropped_image)
+        # info(cropped_image)
         return cropped_image
 
     def unstitch_image(self, image1:ndarray, num_pieces: int = 4) -> list:

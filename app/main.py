@@ -5,10 +5,10 @@ from dependencies.image_functions import decode_image_from_bytes, extract_image
 
 from dependencies import loadConfig
 import time
-import datetime
 import threading
 from mqtt_client import MQTTClient, MQTTConfig
 from numpy import unique
+from logging import info
 #
 MQTT_BROKERS = loadConfig.return_config_value("broker_details")
 TOPICS = MQTT_BROKERS["topics"]
@@ -43,7 +43,7 @@ def main():
     service_id = config.get("service_id", "depth_analysis_1")
     topics = TOPICS
 
-    print(f"INFO : {service_id} starting \n\r")
+    info(f"INFO : {service_id} starting \n\r")
     config = MQTTConfig(host=MQTT_BROKERS["mqtt_ip"], port=MQTT_BROKERS["mqtt_port"])
     client = MQTTClient(config)
     client.connect()
@@ -60,7 +60,6 @@ def main():
                     continue
             else:
                 continue
-            print(time.localtime())
             details = depth_analysis(message)
         
             if details == False: continue
@@ -72,7 +71,7 @@ def main():
             )
 
     except KeyboardInterrupt:
-        print(f"Info: {service_id} Shutting down subscribe listener and exiting.")
+        info(f"Info: {service_id} Shutting down subscribe listener and exiting.")
 
 if __name__ == "__main__":
     main()

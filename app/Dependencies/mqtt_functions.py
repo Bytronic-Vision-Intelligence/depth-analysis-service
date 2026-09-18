@@ -3,7 +3,6 @@ import threading
 from queue import Queue
 from json import loads, dumps, JSONDecodeError
 from logging import info
-from time import sleep
 
 def subscribe_listener(ip: str, port: int, trigger_topic: str, result_queue: Queue, stop_event: threading.Event):
     """Connect to a broker and feed every message on `trigger_topic` into a queue.
@@ -189,4 +188,4 @@ def _message_database(
     target = next((t for t in topics if t.get("name") == "send_depth_analysis"), None)
     if target:
         client.publish(target["topic"], dumps(details))
-        print("String published")
+        info("String published")
