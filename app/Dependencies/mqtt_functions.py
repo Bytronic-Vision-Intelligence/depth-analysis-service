@@ -125,9 +125,7 @@ def check_for_triggers(trigger:dict, is_blocking:bool=False, timeout:float = 10)
 
 def send_details(
         details:dict, 
-        client:MQTTClient, 
-        hmi_command:str, 
-        database_details:dict, 
+        client:MQTTClient,
         topics:dict
     ):
     '''sends extracted details to an mqtt broker with an appropriate command and awaits a response
@@ -142,11 +140,8 @@ def send_details(
         raise ValueError("Error : details cannot be empty")
     if not client.is_connected:
         raise ConnectionError("Error : client is not connected")
-    if hmi_command == "":
-        raise ValueError("Error : hmi_command cannot be empty")
 
-    is_search = hmi_command == "search_database"
-    _message_database(is_search, details, client, database_details, topics)
+    _message_database(details, client, topics)
     database_result = {"waiting_for_result": None}
 
     target = next((t for t in topics if t.get("name") == "receive_analysis_results"), None)
@@ -161,10 +156,8 @@ def send_details(
     return True
 
 def _message_database(
-        is_search:bool, 
         details:dict, 
-        client:MQTTClient, 
-        database_details:dict, 
+        client:MQTTClient,
         topics:dict
     ):
     '''sends command to the broker for the database service
@@ -177,12 +170,6 @@ def _message_database(
         raise ValueError("Error : details cannot be empty")
     if not client.is_connected:
         raise ConnectionError("Error : client is not connected")
-
-    details["command"] = "add_to_database"
-    if is_search: details["command"] = "search_database"
-
-    details["destination"] = database_details["database_table"]
-    details["database_name"] = database_details["database_name"]
 
     target = next((t for t in topics if t.get("name") == "send_depth_analysis"), None)
     if target:
