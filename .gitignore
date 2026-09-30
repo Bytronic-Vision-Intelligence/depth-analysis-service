@@ -1,6 +1,36 @@
+# Python
 *.pyc
-*__pycache__
-.log
-*claude
-*github
-*.png
+__pycache__/
+*.egg-info/
+
+# Virtualenvs
+.venv/
+venv/
+
+# Service repositories cloned into this root. Listed explicitly rather than
+# a *-service/ glob, which misses names like vecow-dio-worker.
+/*-service/
+/*-worker/
+/service-template/
+
+# Test output
+junit/
+.pytest_cache/
+.ruff_cache/
+
+# act run byproducts (docker-local/run.sh)
+docker-local/logs/
+docker-local/artifacts/
+
+# Working notes, not for the remote
+docs/superpowers/
+
+# Editors / OS
+.vscode/
+.idea/
+.claude/
+.DS_Store
+
+# Logs
+*.log
+data

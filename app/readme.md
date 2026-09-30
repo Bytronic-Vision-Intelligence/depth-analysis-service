@@ -9,7 +9,7 @@ Key files:
 Quick example (from project root):
 
 ```powershell
-python -c "from app.Dependencies import loadConfig; print(loadConfig.load_config())"
+python -c "from app.Dependencies import loadConfig; info(loadConfig.load_config())"
 ```
 
 Customize `config.yaml` and re-run your worker entrypoint.
