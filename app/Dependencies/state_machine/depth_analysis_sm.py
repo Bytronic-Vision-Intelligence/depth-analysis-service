@@ -9,7 +9,7 @@ class DepthAnalysisSM(StateMachine):
         super().__init__()
         self.service_id = config.get("service_id", "database_1")
         self.mqtt_client = self.__create_mqtt_client(config)
-        self.topics = self.__create_topic_listners(config)
+        self.topics = self.__create_topic_listners(config.get("broker_details"))
         self.blocking_subscribers = self.__get_blocking_subscribers(self.topics)
         self.ui_request = self.__get_topic(self.topics,"receive_depth_image")
         self.service_output = self.__get_topic(self.topics, "send_depth_analysis")

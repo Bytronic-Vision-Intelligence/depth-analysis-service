@@ -3,7 +3,7 @@ broker_details:
   mqtt_port: 1883
 topics:
 - name: receive_depth_image
-  topic: churchill/camera/camera_1/colour_image
+  topic: churchill/camera/depth_1/image
   is_subscribe: true
   is_trigger: true
 - name: send_depth_analysis
