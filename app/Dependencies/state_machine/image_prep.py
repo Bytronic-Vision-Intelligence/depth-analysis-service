@@ -25,7 +25,8 @@ class ImagePrepState(State):
             self.my_state_machine.trim_value
         )
         depth_image = image_object.cropped_image
-        if len(depth_image) > 2:
+        depth_image_dimentions = len(depth_image.shape)
+        if depth_image_dimentions >= 3:
             depth_image = depth_image[:,:,0]
 
         self.my_state_machine.change_state(
