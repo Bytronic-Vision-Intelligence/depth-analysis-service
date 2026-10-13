@@ -25,7 +25,7 @@ class DepthAnalysisSM(StateMachine):
         qeueue objects to the dictionary as well as reference to the thread
         '''
         broker = config.get('broker_details')
-        topics = broker.get("topics")
+        topics = config.get("topics")
         topic_list = {}
         for topic in topics:
             topic_new = Topic(broker, topic)

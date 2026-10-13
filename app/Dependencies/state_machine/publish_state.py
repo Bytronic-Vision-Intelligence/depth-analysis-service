@@ -6,6 +6,12 @@ class PublishState(State):
         super().__init__(state_machine, state_id)
         self.packet = packet
 
+    def enter(self):
+        super().enter()
+        if not self.my_state_machine.mqtt_client.is_connected:
+            self.my_state_machine.mqtt_client.connect()
+        return
+
     def tick(self):
         ''''''
         mqtt_client = self.my_state_machine.mqtt_client
