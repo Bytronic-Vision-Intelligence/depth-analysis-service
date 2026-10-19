@@ -2,6 +2,8 @@ from .base_functions.state import State
 from .analysis_state import AnalysisState
 from dependencies.image_functions import Image, decode_image_from_bytes, extract_image
 from numpy import unique
+from logging import info
+from cv2 import imshow, waitKey
 class ImagePrepState(State):
     ''''''
     def __init__(self, state_machine,message, state_id = "Image Prep State"):
@@ -12,11 +14,17 @@ class ImagePrepState(State):
         '''prepares the image for analysis, creating the iamge object as it does'''
         image_encoded = extract_image(self.message.get("image"))
         image_decoded = decode_image_from_bytes(image_encoded)
+        imshow(
+            f"{self.my_state_machine.service_id}_image",
+            image_decoded
+        )
+        waitKey(1)
         pixel_range = len(
             unique(image_decoded)
         )
         if pixel_range == 1: 
             self._return_idle()
+            info(f"Info : Pixel range of {pixel_range} is not valid at least 3 values are required ")
             return
         
         image_object = Image(

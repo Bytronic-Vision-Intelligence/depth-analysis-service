@@ -118,22 +118,6 @@ def encode_image_to_bytes(image: ndarray) -> bytes:
             raise RuntimeError("Failed to encode image to PNG format.")
         return encoded_image.tobytes()
 
-def extract_image(encoded_image):
-    '''extracts the image from the encoded array into a ndarray
-    Arga:
-        encoded_image: a string containing the image packet encoded as base64
-    Returns:
-        image: an ndarray containing valid image data
-    '''
-    if isinstance(encoded_image, str) and "," in encoded_image:
-        encoded_image = encoded_image.split(",", 1)[1]
-
-    image_bytes = b64decode(encoded_image)
-    depth_image = imdecode(frombuffer(image_bytes, dtype=uint16), IMREAD_UNCHANGED)
-    if depth_image is None:
-        raise ValueError("Error : The image payload could not be decoded by OpenCV.")
-    return depth_image
-
 def extract_image(encoded_image: str) -> bytes:
     """Decode base64 image bytes from a camera packet."""
     encoded = str(encoded_image).strip()
@@ -147,7 +131,7 @@ def extract_image(encoded_image: str) -> bytes:
 
 def decode_image_from_bytes(data: bytes) -> ndarray:
     """Decode image bytes into an ndarray."""
-    if not data:
+    if len(data) < 1:
         raise ValueError("Empty image bytes.")
 
     image = imdecode(frombuffer(data, uint8), IMREAD_UNCHANGED).astype('uint8')
