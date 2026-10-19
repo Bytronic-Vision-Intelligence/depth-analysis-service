@@ -22,14 +22,14 @@ class FeatureExtraction():
         '''finds the largest contour in an image and returns it
         Returns:
             largetst_contour: the largest contour by area'''
+        image = self.binary_image
         contours, hierachy = cv2.findContours(
-            self.binary_image,
+            image,
             cv2.RETR_TREE,
             cv2.CHAIN_APPROX_SIMPLE
         )
         if len(contours) ==0:
             info("INFO : No contour found in image")
-            print("INFO : No contour found in image")
             return 0
         
         return max(contours, key = cv2.contourArea)
@@ -72,7 +72,6 @@ class FeatureExtraction():
             "min": average(single_channel) - average(single_channel)/2,
             "max": average(single_channel) + average(single_channel)/2
         }
-        
         details["perimeter"] = self._get_perimeter()
         details["radius"] = self._get_radius()
         return details

@@ -5,6 +5,7 @@ import pathlib
 import threading
 from queue import Queue
 import uuid
+from logging import info
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 APP_DIR = ROOT / "app"
@@ -96,7 +97,7 @@ def test_subscribe_listener_puts_payload_into_queue(monkeypatch):
     assert result_queue.get_nowait() == "test-payload"
 
 
-def test_worker_process_function_prints_insert_message(capsys):
+def test_worker_process_function_infos_insert_message(capsys):
     module = load_main_module()
     module.worker_process_function()
 
