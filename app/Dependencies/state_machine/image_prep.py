@@ -1,6 +1,6 @@
 from .base_functions.state import State
 from .analysis_state import AnalysisState
-from dependencies.image_functions import Image, decode_image_from_bytes, extract_image
+from dependencies.image_functions import Image, decode_image_from_bytes, extract_image, decode_raw_height_png
 from numpy import unique
 class ImagePrepState(State):
     ''''''
@@ -10,8 +10,12 @@ class ImagePrepState(State):
 
     def tick(self):
         '''prepares the image for analysis, creating the iamge object as it does'''
+
         image_encoded = extract_image(self.message.get("image"))
+
         image_decoded = decode_image_from_bytes(image_encoded)
+
+        image_decoded = decode_raw_height_png(image_decoded)
         pixel_range = len(
             unique(image_decoded)
         )
