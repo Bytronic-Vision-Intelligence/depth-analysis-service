@@ -16,11 +16,6 @@ class ImagePrepState(State):
         image_encoded = extract_image(self.message.get("image"))
 
         image_decoded = decode_image_from_bytes(image_encoded)
-        imshow(
-            f"{self.my_state_machine.service_id}_image",
-            image_decoded
-        )
-        waitKey(1)
         pixel_range = len(
             unique(image_decoded)
         )
