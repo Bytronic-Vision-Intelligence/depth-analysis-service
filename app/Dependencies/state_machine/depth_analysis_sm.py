@@ -24,7 +24,7 @@ class DepthAnalysisSM(StateMachine):
         '''creates a set of listners for the given topics and adds
         qeueue objects to the dictionary as well as reference to the thread
         '''
-        broker = config.get('broker_details')
+        broker = config.get('mqtt')
         topics = config.get("topics")
         topic_list = {}
         for topic in topics:
@@ -35,7 +35,7 @@ class DepthAnalysisSM(StateMachine):
     @staticmethod
     def __create_mqtt_client(config:dict):
         '''creates an mqtt client object from the config'''
-        broker_details = config.get("broker_details")
+        broker_details = config.get("mqtt")
         
         mqtt_config = MQTTConfig(
             host=broker_details["mqtt_ip"], 
