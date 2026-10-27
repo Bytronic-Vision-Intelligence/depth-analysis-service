@@ -20,8 +20,8 @@ topics:
   is_trigger: true
 image_options:
   region_of_interest:
-  - 0
-  - 0
-  - 25000
-  - 30000
+  - 700
+  - 100
+  - 2500
+  - 2100
   trim_value: 0.0325

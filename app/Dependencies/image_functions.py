@@ -1,6 +1,6 @@
 from numpy import ndarray, unique, median, clip, vstack
 from base64 import b64decode
-from cv2 import IMREAD_UNCHANGED, imdecode, imencode
+from cv2 import IMREAD_UNCHANGED, imdecode, imencode, imwrite
 from numpy import frombuffer, uint8, asarray, nan, float32, ndarray, uint16
 from multiprocessing import Pool
 from logging import info
@@ -68,6 +68,7 @@ class Image():
         '''
         cropped_image = image[region_of_interest[1]:region_of_interest[3], region_of_interest[0]: region_of_interest[2]]
         # info(cropped_image)
+        imwrite("cropped_depth.png", cropped_image)
         return cropped_image
 
     def unstitch_image(self, image1:ndarray, num_pieces: int = 4) -> list:

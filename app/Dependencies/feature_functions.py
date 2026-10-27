@@ -1,14 +1,17 @@
 from numpy import (
     ndarray, 
     average, 
-    dstack
+    dstack,
+    where,
+    mean,
+    abs
 )
 import cv2
 from logging import info
 
 class FeatureExtraction():
     '''a simple class handler for feature extraction and image processing'''
-    def __init__(self, blur_value:int = [3,3]):
+    def __init__(self, blur_value:int = [7,7]):
         if blur_value[0] % 2 == 0 and blur_value[1] % 2 == 0: 
             raise ValueError(f"Error : blur values must be odd and more than 1 value of {blur_value} is not valid")
         self.blur_value = blur_value
@@ -65,13 +68,18 @@ class FeatureExtraction():
         self.three_channel_binary = dstack((self.binary_image, self.binary_image, self.binary_image))
         
         details = dict()
+        image = self.__remove_outliers(image)
         single_channel = image if image.ndim == 2 else image[:, :, 0]
+        cv2.imwrite("outliers removed.png", single_channel)
         details["depth"] = float(single_channel.max() - single_channel.min())
 
-        thresh = {
-            "min": average(single_channel) - average(single_channel)/2,
-            "max": average(single_channel) + average(single_channel)/2
-        }
         details["perimeter"] = self._get_perimeter()
         details["radius"] = self._get_radius()
         return details
+
+    def __remove_outliers(self, image: ndarray, threshold: float = 75) -> ndarray:
+        """Replace values more than `threshold` percent from the mean with the mean."""
+        average_value = mean(image)
+        cutoff = abs(average_value) * threshold / 100
+        outliers = abs(image - average_value) > cutoff
+        return where(outliers, 0, image)
