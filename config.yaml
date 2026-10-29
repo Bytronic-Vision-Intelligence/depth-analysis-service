@@ -21,3 +21,5 @@ image_options:
   - 2500
   - 3000
   trim_value: 0.0325
+  # [x, y] size of one pixel in mm, y is the LJ-S line pitch divided by interpolate_y
+  # pixel_pitch_mm: [x, y]

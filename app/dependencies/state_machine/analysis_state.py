@@ -7,7 +7,7 @@ class AnalysisState(State):
     def __init__(self, state_machine,image, state_id = "Analysis State"):
         super().__init__(state_machine, state_id)
         self.image = image
-        self.extractor = FeatureExtraction()
+        self.extractor = FeatureExtraction(state_machine.pixel_pitch_mm)
     def tick(self):
         ''''''
         image_details = self.extractor.get_subject_details(

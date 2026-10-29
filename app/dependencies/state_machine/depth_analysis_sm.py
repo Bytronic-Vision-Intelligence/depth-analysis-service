@@ -17,6 +17,10 @@ class DepthAnalysisSM(StateMachine):
         image_options = config.get("image_options")
         self.region_of_interest = image_options.get("region_of_interest")
         self.trim_value = image_options.get("trim_value")
+        # [x, y] size of one pixel in mm, y is the line pitch divided by the camera's interpolate_y
+        self.pixel_pitch_mm = image_options.get("pixel_pitch_mm")
+        if self.pixel_pitch_mm is None:
+            raise ValueError("Error : image_options.pixel_pitch_mm must be set in the config as [x, y] in mm")
         self.state = IdleState(self)
 
     @staticmethod

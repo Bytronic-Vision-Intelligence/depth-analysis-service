@@ -1,7 +1,7 @@
 from numpy import ndarray, unique, median, clip, vstack
 from base64 import b64decode
-from cv2 import IMREAD_UNCHANGED, imdecode, imencode, imwrite
-from numpy import frombuffer, uint8, asarray, nan, float32, ndarray, uint16
+from cv2 import IMREAD_UNCHANGED, imdecode, imencode, imwrite, morphologyEx, getStructuringElement, connectedComponentsWithStats, dilate, MORPH_RECT, MORPH_OPEN, MORPH_CLOSE, CC_STAT_AREA
+from numpy import frombuffer, uint8, asarray, nan, float32, ndarray, uint16, where, zeros, ones, isin, arange
 from multiprocessing import Pool
 from logging import info
 RAW_PNG_MM_SCALE=100.00
@@ -16,7 +16,10 @@ class Image():
 
         self.image = image
         self.cropped_image = self._crop_image(image,self.region_of_interest)
-        self.trimmed_image = self._trim_min_max(self.cropped_image)
+        # spikes must go before trimming, which overwrites the zeros that mark invalid pixels
+        self.cropped_image = remove_spikes(self.cropped_image)
+        # trim a copy so cropped_image keeps its zeros for the analysis
+        self.trimmed_image = self._trim_min_max(self.cropped_image.copy())
 
     def set_trim_value(self,trim_value:float):
         '''sets the trim value variable used for the removal of background depth data
@@ -111,6 +114,51 @@ class Image():
 
         return self.stitch_image(results)
 
+def remove_spikes(image: ndarray, max_width: int = 51, min_jump: float = 5, min_area: int = 200, search_distance: int = 15) -> ndarray:
+    '''sets glare spikes and dips to 0 so they are treated like any other invalid pixel
+    Glare shows up as narrow streaks that jump above or below the pixels either side.
+    An opening (closing for dips) max_width long, in x and then y, gives the surface without
+    anything narrower, so the check depends on width not height and a large subject is
+    left alone however high it is. Fragments of glare left stranded between dropouts have
+    no surface to compare against, so small patches next to a spike are removed too.
+    Args:
+        image: an ndarray representing the depth image, 0 marks invalid pixels
+        max_width: odd width in pixels, wider than the widest spike but narrower than the subject
+        min_jump: how far a pixel must stand above or below the surface to count as a spike
+        min_area: patches of valid pixels smaller than this many pixels next to a spike are removed
+        search_distance: how close in pixels a patch must be to a spike to be removed
+    Returns:
+        cleaned: a copy of the image with spikes set to 0
+    '''
+    single_channel = image if image.ndim == 2 else image[:, :, 0]
+    valid = single_channel > 0
+    if not valid.any():
+        return image.copy()
+    values = single_channel.astype(float32)
+    # invalid pixels must not pull the surface down when looking for spikes
+    raised_invalid = where(valid, values, values.max())
+    spikes = zeros(valid.shape, bool)
+    for shape in ((max_width, 1), (1, max_width)):
+        kernel = getStructuringElement(MORPH_RECT, shape)
+        spikes |= values - morphologyEx(raised_invalid, MORPH_OPEN, kernel) > min_jump
+        spikes |= morphologyEx(values, MORPH_CLOSE, kernel) - values > min_jump
+    spikes &= valid
+    if not spikes.any():
+        return image.copy()
+
+    # only patches near a spike, so isolated specks of real surface such as a rim are kept
+    count, labels, stats, _ = connectedComponentsWithStats((valid & ~spikes).astype(uint8), connectivity=8)
+    near_spike = dilate(spikes.astype(uint8), ones((search_distance, search_distance), uint8)) > 0
+    small = stats[:, CC_STAT_AREA] < min_area
+    small &= isin(arange(count), labels[near_spike])
+    small[0] = False
+    spikes |= small[labels]
+    if spikes.any():
+        info(f"INFO : removed {int(spikes.sum())} spike pixels")
+    cleaned = image.copy()
+    cleaned[spikes] = 0
+    return cleaned
+
 def encode_image_to_bytes(image: ndarray) -> bytes:
     """Encode the image as JPEG (8-bit) or PNG (uint16)."""
     if image.dtype == uint16:
@@ -135,7 +183,8 @@ def decode_image_from_bytes(data: bytes) -> ndarray:
     if len(data) < 1:
         raise ValueError("Empty image bytes.")
 
-    image = imdecode(frombuffer(data, uint8), IMREAD_UNCHANGED).astype('uint8')
+    # keep the native dtype, depth arrives as uint16 mm and casting to uint8 wraps anything over 255
+    image = imdecode(frombuffer(data, uint8), IMREAD_UNCHANGED)
     if image is None:
         raise ValueError("Could not decode image bytes.")
     return image
