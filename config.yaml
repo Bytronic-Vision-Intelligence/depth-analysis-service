@@ -22,4 +22,5 @@ image_options:
   - 3000
   trim_value: 0.0325
   # [x, y] size of one pixel in mm, y is the LJ-S line pitch divided by interpolate_y
-  # pixel_pitch_mm: [x, y]
+  # LJ-S640 on churchill: dwPitchX = 20000 and dwPitchY = 80000 (0.01um), interpolate_y 4
+  pixel_pitch_mm: [0.2, 0.2]
