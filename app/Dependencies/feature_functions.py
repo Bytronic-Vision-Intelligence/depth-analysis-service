@@ -1,9 +1,12 @@
 from numpy import (
-    ndarray, 
-    unravel_index, 
+    ndarray,
     dstack,
     where,
-    mean,
+    float32,
+    uint8,
+    unique,
+    isin,
+    median,
     abs
 )
 import cv2
@@ -77,13 +80,45 @@ class FeatureExtraction():
         details["radius"] = self._get_radius()
         return details
 
-    def __remove_outliers(self, image: ndarray, blob_size:float=500.0) -> ndarray:
-        """Replace values more than `threshold` percent from the mean with the mean."""
-        average_value = mean(image)
-        max_index = unravel_index(image.argmax(), image.shape)
+    def __remove_outliers(self, image: ndarray, kernel_size: int = 51, min_height: float = 10, low_ratio: float = 0.25) -> ndarray:
+        '''removes narrow raised spikes (e.g. glare) including their gradual flanks
+        A morphological opening wider than the spike estimates the underlying surface.
+        Regions rising above the noise floor are removed if they peak more than
+        min_height above the surface, so the whole ramp is removed rather than just the tip.
+        Args:
+            image: an ndarray representing the depth image
+            kernel_size: odd width in pixels, wider than the widest spike but narrower than the subject
+            min_height: how far above the surface a peak must rise to count as a spike
+            low_ratio: fraction of min_height used to grow the spike region down its flanks
+        Returns:
+            cleaned: a copy of the image with spikes replaced by the surface estimate
+        '''
+        single_channel = image if image.ndim == 2 else image[:, :, 0]
+        valid = single_channel > 0
+        if not valid.any():
+            return image
+        smoothed = cv2.blur(single_channel.astype(float32), (5, 5))
+        # stop invalid zero pixels dragging the surface estimate down
+        surface_input = where(valid, smoothed, smoothed.max())
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (kernel_size, kernel_size))
+        surface = cv2.morphologyEx(surface_input, cv2.MORPH_OPEN, kernel)
+        height_above = where(valid, smoothed - surface, 0)
 
-        for i in range(int(max_index[0]-blob_size/2),int(max_index[0]+blob_size/2)):
-            for j in range(int(max_index[1]-blob_size/2), int(max_index[1]+blob_size/2)):
-                image[i,j] = average_value
+        # the opening sits at the bottom of the noise, so measure the noise floor and keep above it
+        valid_heights = height_above[valid]
+        noise_level = median(valid_heights)
+        noise_spread = 1.4826 * median(abs(valid_heights - noise_level))
+        low_threshold = max(min_height * low_ratio, noise_level + 4 * noise_spread)
+        surface = surface + noise_level
 
-        return image
+        candidates = (height_above > low_threshold).astype(uint8)
+        _, labels = cv2.connectedComponents(candidates)
+        spike_labels = unique(labels[height_above > noise_level + min_height])
+        spikes = isin(labels, spike_labels[spike_labels != 0])
+        if spikes.any():
+            info(f"INFO : removed {int(spikes.sum())} spike pixels")
+
+        cleaned = image.copy()
+        fill = surface[spikes]
+        cleaned[spikes] = (fill if image.ndim == 2 else fill[:, None]).astype(image.dtype)
+        return cleaned
