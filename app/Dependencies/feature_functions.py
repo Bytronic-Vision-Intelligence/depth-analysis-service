@@ -1,6 +1,6 @@
 from numpy import (
     ndarray, 
-    average, 
+    unravel_index, 
     dstack,
     where,
     mean,
@@ -70,16 +70,20 @@ class FeatureExtraction():
         details = dict()
         image = self.__remove_outliers(image)
         single_channel = image if image.ndim == 2 else image[:, :, 0]
-        cv2.imwrite("outliers removed.png", single_channel)
         details["depth"] = float(single_channel.max() - single_channel.min())
+        cv2.imwrite("outliers removed.png", single_channel)
 
         details["perimeter"] = self._get_perimeter()
         details["radius"] = self._get_radius()
         return details
 
-    def __remove_outliers(self, image: ndarray, threshold: float = 75) -> ndarray:
+    def __remove_outliers(self, image: ndarray, blob_size:float=500.0) -> ndarray:
         """Replace values more than `threshold` percent from the mean with the mean."""
         average_value = mean(image)
-        cutoff = abs(average_value) * threshold / 100
-        outliers = abs(image - average_value) > cutoff
-        return where(outliers, 0, image)
+        max_index = unravel_index(image.argmax(), image.shape)
+
+        for i in range(int(max_index[0]-blob_size/2),int(max_index[0]+blob_size/2)):
+            for j in range(int(max_index[1]-blob_size/2), int(max_index[1]+blob_size/2)):
+                image[i,j] = average_value
+
+        return image
