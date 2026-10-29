@@ -1,7 +1,7 @@
 import numpy as np
 import cv2
 import pytest
-from dependencies.image_functions import Image, remove_spikes, decode_image_from_bytes
+from dependencies.image_functions import Image, find_spikes, remove_spikes, decode_image_from_bytes
 
 
 def tilted_plate(height=400, width=400):
@@ -31,6 +31,34 @@ def test_narrow_dip_is_set_to_zero():
     image[100:300, 200:204] -= 15
     cleaned = remove_spikes(image)
     assert (cleaned[100:300, 200:204] == 0).all()
+
+
+def test_spike_with_dropouts_beside_it_is_set_to_zero():
+    image = tilted_plate()
+    # as on the churchill bowls: a thin streak with the surface right beside it on one side
+    # and dropouts wider than the search window on the other
+    image[100:300, 203:290] = 0
+    image[100:300, 200:203] += 60
+    cleaned = remove_spikes(image)
+    assert (cleaned[100:300, 200:203] == 0).all()
+
+
+def test_deep_bowl_rim_running_across_the_image_is_kept():
+    image = tilted_plate()
+    # a rim 20px deep in y that steps straight up from the plate, with the bowl's inner
+    # wall falling away 1mm per row below it, narrow in y but wide in x
+    image[150:170, 50:350] += 78
+    image[170:240, 50:350] += (78 - np.arange(1, 71)).astype(np.uint16)[:, None]
+    cleaned = remove_spikes(image)
+    assert np.array_equal(cleaned[150:170, 60:340], image[150:170, 60:340])
+
+
+def test_find_spikes_returns_the_mask_remove_spikes_applies():
+    image = tilted_plate()
+    image[100:300, 200:205] += 150
+    spikes = find_spikes(image)
+    assert spikes.dtype == bool and spikes[100:300, 200:205].all()
+    assert np.array_equal(remove_spikes(image, spikes) == 0, spikes)
 
 
 def test_tall_wide_subject_keeps_its_height():
@@ -99,6 +127,8 @@ def test_image_keeps_zeros_in_cropped_image_and_trims_a_copy():
     assert (cropped[10:20, 10:20] == 0).all()
     assert (image_object.trimmed_image > 0).all()
     assert image_object.trimmed_image is not cropped
+    assert image_object.spike_mask[90:290, 190:195].all()
+    assert not image_object.spike_mask[10:20, 10:20].any()
 
 
 def main():

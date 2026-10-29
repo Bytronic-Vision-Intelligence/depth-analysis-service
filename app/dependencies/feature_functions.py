@@ -10,7 +10,8 @@ from numpy import (
     mgrid,
     where,
     abs,
-    array
+    array,
+    partition
 )
 from numpy.linalg import lstsq
 import cv2
@@ -18,13 +19,17 @@ from logging import info
 
 class FeatureExtraction():
     '''a simple class handler for feature extraction and image processing'''
-    def __init__(self, pixel_pitch_mm: list, plate_tolerance_mm: float = 3.0, min_subject_height_mm: float = 5.0, gap_close_px: int = 31):
+    def __init__(self, pixel_pitch_mm: list, plate_tolerance_mm: float = 3.0, min_subject_height_mm: float = 5.0, gap_close_px: int = 31, depth_support_px: int = 50, max_glare_fraction: float = 0.2):
         '''
         Args:
             pixel_pitch_mm: [x, y] size of one image pixel in mm
             plate_tolerance_mm: how far from the fitted plate a pixel can be and still count as plate
             min_subject_height_mm: how far above the plate a pixel must be to count as the subject
             gap_close_px: dropout gaps in the subject smaller than this are closed before outlining it
+            depth_support_px: depth is the height reached by at least this many pixels, so a few
+                stray pixels of glare cannot set it
+            max_glare_fraction: frames where more than this share of the subject's readings were
+                glare are rejected
         '''
         if pixel_pitch_mm is None or len(pixel_pitch_mm) != 2 or min(pixel_pitch_mm) <= 0:
             raise ValueError(f"Error : pixel pitch of {pixel_pitch_mm} is not valid, must be [x, y] in mm and above 0")
@@ -32,6 +37,8 @@ class FeatureExtraction():
         self.plate_tolerance_mm = plate_tolerance_mm
         self.min_subject_height_mm = min_subject_height_mm
         self.gap_close_px = gap_close_px
+        self.depth_support_px = depth_support_px
+        self.max_glare_fraction = max_glare_fraction
         self.height_image = None
         self.binary_image = None
 
@@ -76,12 +83,15 @@ class FeatureExtraction():
         # the hull ignores bites taken out of the outline by dropouts along the rim
         return cv2.convexHull(max(contours, key=cv2.contourArea))
 
-    def get_subject_details(self, image: ndarray) -> dict:
+    def get_subject_details(self, image: ndarray, glare_mask: ndarray = None) -> dict:
         '''Extracts the depth, perimeter and radius of the subject in mm
         Args:
             image: a np.ndarray representing the depth image in mm, 0 marks invalid pixels
+            glare_mask: the pixels already removed from the image as glare, used to reject the
+                frame when too much of the subject was glare
         Returns:
-            details: a dictionary containing details of the subject, or False if there is no subject'''
+            details: a dictionary containing details of the subject, or False if there is no
+                subject or the frame is rejected for glare'''
         single_channel = image if image.ndim == 2 else image[:, :, 0]
         valid = single_channel > 0
         if not valid.any():
@@ -93,11 +103,19 @@ class FeatureExtraction():
         if subject_hull is None:
             return False
         inside = cv2.drawContours(valid.astype(uint8) * 0, [subject_hull], -1, 1, -1) > 0
+        if glare_mask is not None:
+            # as a share of the pixels that had a reading, dropouts would dilute it otherwise
+            glare_fraction = (glare_mask & inside).sum() / (inside & (valid | glare_mask)).sum()
+            if glare_fraction > self.max_glare_fraction:
+                info(f"INFO : frame rejected, {glare_fraction:.0%} of the subject was glare")
+                return False
         hull_mm = (subject_hull.reshape(-1, 2) * self.pixel_pitch_mm).astype(float32)
         _, radius = cv2.minEnclosingCircle(hull_mm)
+        subject_heights = self.height_image[inside & valid]
+        support = min(self.depth_support_px, subject_heights.size)
 
         details = dict()
-        details["depth"] = float(self.height_image[inside & valid].max())
+        details["depth"] = float(partition(subject_heights, -support)[-support])
         details["perimeter"] = float(cv2.arcLength(hull_mm, True))
         details["radius"] = float(radius)
         return details

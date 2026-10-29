@@ -35,5 +35,5 @@ class ImagePrepState(State):
             depth_image = depth_image[:,:,0]
 
         self.my_state_machine.change_state(
-            AnalysisState(self.my_state_machine, depth_image)
+            AnalysisState(self.my_state_machine, depth_image, image_object.spike_mask)
         )

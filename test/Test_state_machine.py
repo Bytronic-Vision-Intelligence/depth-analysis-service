@@ -45,6 +45,15 @@ def test_analysis_state_measures_with_the_configured_pitch():
     assert state.extractor.pixel_pitch_mm.tolist() == pytest.approx([0.2, 0.05])
 
 
+def test_analysis_state_passes_the_glare_mask_to_the_measurement():
+    calls = {}
+    state = AnalysisState(SimpleNamespace(pixel_pitch_mm=[0.2, 0.05]), image="image", glare_mask="mask")
+    state.extractor.get_subject_details = lambda image, glare_mask: calls.update(image=image, glare_mask=glare_mask) or False
+    state._return_idle = lambda: calls.update(idle=True)
+    state.tick()
+    assert calls == {"image": "image", "glare_mask": "mask", "idle": True}
+
+
 def main():
     pytest.main()
 

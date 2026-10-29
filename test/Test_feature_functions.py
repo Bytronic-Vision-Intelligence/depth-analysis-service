@@ -43,6 +43,31 @@ def test_glare_inside_the_bowl_does_not_change_the_measurement():
     assert details["radius"] == pytest.approx(clean["radius"], rel=0.01)
 
 
+def test_a_few_stray_glare_pixels_do_not_set_the_depth():
+    clean = FeatureExtraction(PITCH).get_subject_details(bowl_scene())
+    stray = bowl_scene()
+    stray[402:432, 250] = 150
+    details = FeatureExtraction(PITCH).get_subject_details(stray)
+    assert details["depth"] == pytest.approx(clean["depth"], abs=0.5)
+
+
+def test_frame_is_rejected_when_too_much_of_the_subject_was_glare():
+    scene = bowl_scene()
+    glare = np.zeros(scene.shape, bool)
+    glare[250:550, 180:320] = scene[250:550, 180:320] > 0
+    scene[glare] = 0
+    assert FeatureExtraction(PITCH).get_subject_details(scene, glare) is False
+
+
+def test_frame_with_a_little_glare_is_still_measured():
+    scene = bowl_scene()
+    glare = np.zeros(scene.shape, bool)
+    glare[300:450, 240:245] = True
+    scene[glare] = 0
+    details = FeatureExtraction(PITCH).get_subject_details(scene, glare)
+    assert details["depth"] == pytest.approx(RIM_HEIGHT_MM, abs=1)
+
+
 def test_empty_plate_has_no_subject():
     assert FeatureExtraction(PITCH).get_subject_details(bowl_scene(with_bowl=False)) is False
 
