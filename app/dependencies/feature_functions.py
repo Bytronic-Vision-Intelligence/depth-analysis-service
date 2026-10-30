@@ -11,7 +11,9 @@ from numpy import (
     where,
     abs,
     array,
-    partition
+    partition,
+    unique,
+    zeros
 )
 from numpy.linalg import lstsq
 import cv2
@@ -64,12 +66,46 @@ class FeatureExtraction():
         plane = coefficients[0] * x_grid + coefficients[1] * y_grid + coefficients[2]
         return where(valid, image - plane, 0).astype(float32)
 
-    def _get_largest_subject(self):
+    @staticmethod
+    def _enclosed_dropouts(valid: ndarray, raised: ndarray) -> ndarray:
+        '''the pixels with no reading that sit inside the floor and against the subject
+        A dark or glossy plate returns almost no laser light, so most of it has no reading at all;
+        the floor around it still does, so the plate shows as a hole in the floor. Holes that touch
+        the edge of the image are scan margins, and holes nowhere near anything raised (a dark mark
+        on an empty floor) are not a plate, so both are left out.
+        Args:
+            valid: an ndarray of bools marking the pixels that hold a measurement
+            raised: an ndarray of bools marking the pixels above the subject height
+        Returns:
+            an ndarray of bools marking the dropouts that belong to the subject
+        '''
+        count, labels, stats, _ = cv2.connectedComponentsWithStats((~valid).astype(uint8), connectivity=8)
+        h, w = valid.shape
+        x, y, bw, bh = stats[:, 0], stats[:, 1], stats[:, 2], stats[:, 3]
+        on_border = (x == 0) | (y == 0) | (x + bw >= w) | (y + bh >= h)
+        near_raised = cv2.dilate(raised.astype(uint8), cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (15, 15))) > 0
+        touching = zeros(count, bool)
+        touching[unique(labels[near_raised & ~valid])] = True
+        keep = touching & ~on_border
+        keep[0] = False  # label 0 is the pixels that do have a reading
+        return keep[labels]
+
+    def _get_largest_subject(self, valid: ndarray = None):
         '''finds the largest region standing above the plate and returns its outline
+        Args:
+            valid: the pixels that hold a measurement; when given, dropouts enclosed by the floor
+                and against the subject count as subject, so a plate that returns little laser
+                light is outlined by its footprint rather than by the few readings it gave
         Returns:
             subject_hull: the convex hull of the largest region in pixels, or None if there is none
         '''
-        subject = (self.height_image > self.min_subject_height_mm).astype(uint8)
+        raised = self.height_image > self.min_subject_height_mm
+        if not raised.any():
+            info("INFO : No subject found above the plate")
+            return None
+        if valid is not None:
+            raised = raised | self._enclosed_dropouts(valid, raised)
+        subject = raised.astype(uint8)
         kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (self.gap_close_px, self.gap_close_px))
         self.binary_image = cv2.morphologyEx(subject, cv2.MORPH_CLOSE, kernel) * 255
         contours, hierachy = cv2.findContours(
@@ -99,7 +135,7 @@ class FeatureExtraction():
             return False
         self.height_image = self._get_plate_heights(single_channel, valid)
 
-        subject_hull = self._get_largest_subject()
+        subject_hull = self._get_largest_subject(valid)
         if subject_hull is None:
             return False
         inside = cv2.drawContours(valid.astype(uint8) * 0, [subject_hull], -1, 1, -1) > 0
