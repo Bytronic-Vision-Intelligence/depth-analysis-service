@@ -21,6 +21,8 @@ class DepthAnalysisSM(StateMachine):
         self.pixel_pitch_mm = image_options.get("pixel_pitch_mm")
         if self.pixel_pitch_mm is None:
             raise ValueError("Error : image_options.pixel_pitch_mm must be set in the config as [x, y] in mm")
+        # message_id of the instruction the depth image was captured for, passed on with the result
+        self.message_id = None
         self.state = IdleState(self)
 
     @staticmethod

@@ -15,6 +15,7 @@ class PublishState(State):
     def tick(self):
         ''''''
         mqtt_client = self.my_state_machine.mqtt_client
+        self.packet["message_id"] = self.my_state_machine.message_id
         mqtt_client.publish(
             self.my_state_machine.service_output.topic,
             dumps(self.packet)

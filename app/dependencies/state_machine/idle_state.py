@@ -14,6 +14,7 @@ class IdleState(State):
         instruction = message.get("image")
         if instruction == None: return
 
+        self.my_state_machine.message_id = message.get("message_id")
         self.my_state_machine.change_state(
             ImagePrepState(self.my_state_machine, message)
         )
