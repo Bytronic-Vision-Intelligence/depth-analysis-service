@@ -116,17 +116,15 @@ def test_decode_rejects_empty_bytes():
         decode_image_from_bytes(b"")
 
 
-def test_image_keeps_zeros_in_cropped_image_and_trims_a_copy():
+def test_image_crops_and_keeps_zeros_in_cropped_image():
     image = tilted_plate()
     image[100:300, 200:205] += 150
     image[20:30, 20:30] = 0
-    image_object = Image(image, [10, 10, 390, 390], 0.0325)
+    image_object = Image(image, [10, 10, 390, 390])
     cropped = image_object.cropped_image
     assert cropped.shape == (380, 380)
     assert (cropped[90:290, 190:195] == 0).all()
     assert (cropped[10:20, 10:20] == 0).all()
-    assert (image_object.trimmed_image > 0).all()
-    assert image_object.trimmed_image is not cropped
     assert image_object.spike_mask[90:290, 190:195].all()
     assert not image_object.spike_mask[10:20, 10:20].any()
 

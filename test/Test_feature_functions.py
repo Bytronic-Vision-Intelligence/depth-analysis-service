@@ -35,10 +35,10 @@ def test_bowl_is_measured_relative_to_the_plate_in_mm():
 
 
 def test_glare_inside_the_bowl_does_not_change_the_measurement():
-    clean = FeatureExtraction(PITCH).get_subject_details(Image(bowl_scene(), [0, 0, 500, 800], 0.0325).cropped_image)
+    clean = FeatureExtraction(PITCH).get_subject_details(Image(bowl_scene(), [0, 0, 500, 800]).cropped_image)
     glare = bowl_scene()
     glare[300:450, 240:245] = 200
-    details = FeatureExtraction(PITCH).get_subject_details(Image(glare, [0, 0, 500, 800], 0.0325).cropped_image)
+    details = FeatureExtraction(PITCH).get_subject_details(Image(glare, [0, 0, 500, 800]).cropped_image)
     assert details["depth"] == pytest.approx(clean["depth"], abs=0.5)
     assert details["radius"] == pytest.approx(clean["radius"], rel=0.01)
 

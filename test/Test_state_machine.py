@@ -28,7 +28,7 @@ def make_config(image_options):
 def test_state_machine_reads_pixel_pitch_from_config(monkeypatch):
     monkeypatch.setattr(depth_analysis_sm, "MQTTClient", FakeMQTTClient)
     state_machine = depth_analysis_sm.DepthAnalysisSM(make_config(
-        {"region_of_interest": [700, 100, 2500, 2100], "trim_value": 0.0325, "pixel_pitch_mm": [0.2, 0.05]}
+        {"region_of_interest": [700, 100, 2500, 2100], "pixel_pitch_mm": [0.2, 0.05]}
     ))
     assert state_machine.pixel_pitch_mm == [0.2, 0.05]
     assert state_machine.region_of_interest == [700, 100, 2500, 2100]
@@ -37,7 +37,7 @@ def test_state_machine_reads_pixel_pitch_from_config(monkeypatch):
 def test_state_machine_requires_pixel_pitch(monkeypatch):
     monkeypatch.setattr(depth_analysis_sm, "MQTTClient", FakeMQTTClient)
     with pytest.raises(ValueError):
-        depth_analysis_sm.DepthAnalysisSM(make_config({"region_of_interest": [0, 0, 10, 10], "trim_value": 0.0325}))
+        depth_analysis_sm.DepthAnalysisSM(make_config({"region_of_interest": [0, 0, 10, 10]}))
 
 
 def test_analysis_state_measures_with_the_configured_pitch():
