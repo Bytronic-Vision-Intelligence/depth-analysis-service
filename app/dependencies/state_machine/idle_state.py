@@ -1,6 +1,7 @@
 from .base_functions.state import State
 from dependencies.mqtt.mqtt_functions import check_for_messages
 from .image_prep import ImagePrepState
+from dependencies.cycle_timing import CycleTiming
 
 class IdleState(State):
     ''''''
@@ -15,6 +16,7 @@ class IdleState(State):
         if instruction == None: return
 
         self.my_state_machine.message_id = message.get("message_id")
+        self.my_state_machine.timing = CycleTiming(message.get("message_id"))
         self.my_state_machine.change_state(
             ImagePrepState(self.my_state_machine, message)
         )

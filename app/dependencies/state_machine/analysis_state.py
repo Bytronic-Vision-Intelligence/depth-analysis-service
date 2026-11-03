@@ -1,6 +1,7 @@
 from .base_functions.state import State
 from .publish_state import PublishState
 from dependencies.feature_functions import FeatureExtraction
+from dependencies.cycle_timing import mark, report
 
 class AnalysisState(State):
     ''''''
@@ -15,7 +16,9 @@ class AnalysisState(State):
             self.image,
             self.glare_mask
         )
+        mark(self.my_state_machine, "measure")
         if image_details == False:
+            report(self.my_state_machine, "no plate")
             self._return_idle()
             return
 

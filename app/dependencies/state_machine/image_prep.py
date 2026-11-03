@@ -1,6 +1,7 @@
 from .base_functions.state import State
 from .analysis_state import AnalysisState
 from dependencies.image_functions import Image, decode_image_from_bytes, extract_image
+from dependencies.cycle_timing import mark, report
 from logging import info
 class ImagePrepState(State):
     ''''''
@@ -14,7 +15,9 @@ class ImagePrepState(State):
         image_encoded = extract_image(self.message.get("image"))
 
         image_decoded = decode_image_from_bytes(image_encoded)
+        mark(self.my_state_machine, "decode")
         if image_decoded.min() == image_decoded.max():
+            report(self.my_state_machine, "single-value image")
             self._return_idle()
             info("Info : image is a single value, nothing to analyse")
             return
@@ -23,6 +26,7 @@ class ImagePrepState(State):
             image_decoded,
             self.my_state_machine.region_of_interest
         )
+        mark(self.my_state_machine, "crop+spikes")
         depth_image = image_object.cropped_image
         depth_image_dimentions = len(depth_image.shape)
         if depth_image_dimentions >= 3:
