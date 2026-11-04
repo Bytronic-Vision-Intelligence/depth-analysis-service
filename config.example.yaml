@@ -1,0 +1,34 @@
+# depth-analysis-service: measure the subject in a depth image and publish its size.
+#
+# This is the documented SHAPE of the configuration, not deployment config:
+# service-orchestrator writes the real one to app/configs/config.yaml (or
+# config-N.yaml for a second instance) from the project's orchestrator config,
+# and launches the service with --config pointing at it. That generated file
+# is not tracked, so a site's topics and settings never end up in this
+# repository.
+
+mqtt:
+  mqtt_ip: localhost
+  mqtt_port: 1883
+
+topics:
+  - name: receive_depth_image          # the depth camera's image; triggers an analysis
+    topic: project/camera/depth_1/image
+    is_subscribe: true
+    is_trigger: true
+  - name: send_depth_analysis          # the measurements, sent on to the database search
+    topic: project/depth_analysis/search/sku_data
+    is_subscribe: false
+    is_trigger: false
+  - name: receive_analysis_results
+    topic: project/database/search/matching_sku
+    is_subscribe: true
+    is_trigger: true
+
+image_options:
+  # [left, top, right, bottom] in pixels of the received image; the analysis
+  # ignores everything outside it.
+  region_of_interest: [0, 0, 2500, 3000]
+  # [x, y] size of one pixel in mm. Required. For an LJ-S head, y is the line
+  # pitch divided by the camera's interpolate_y.
+  pixel_pitch_mm: [0.2, 0.2]
