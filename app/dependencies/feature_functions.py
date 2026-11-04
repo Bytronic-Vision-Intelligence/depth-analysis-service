@@ -13,11 +13,14 @@ from numpy import (
     array,
     partition,
     unique,
-    zeros
+    zeros,
+    empty,
+    arange,
 )
 from numpy.linalg import lstsq
 import cv2
 from logging import info
+from dependencies.row_blocks import run_in_row_blocks
 
 class FeatureExtraction():
     '''a simple class handler for feature extraction and image processing'''
@@ -62,9 +65,18 @@ class FeatureExtraction():
         for _ in range(6):
             coefficients = lstsq(points[plate], z[plate], rcond=None)[0]
             plate = abs(z - points @ coefficients) < self.plate_tolerance_mm
-        y_grid, x_grid = mgrid[:image.shape[0], :image.shape[1]]
-        plane = coefficients[0] * x_grid + coefficients[1] * y_grid + coefficients[2]
-        return where(valid, image - plane, 0).astype(float32)
+        # the plane a*x + b*y + c, evaluated by broadcasting a row of x against a column of y
+        # (the same arithmetic as full coordinate grids, without building them), in row blocks
+        heights = empty(image.shape, float32)
+        x = arange(image.shape[1])[None, :]
+
+        def block(top, bottom):
+            y = arange(top, bottom)[:, None]
+            plane = coefficients[0] * x + coefficients[1] * y + coefficients[2]
+            heights[top:bottom] = where(valid[top:bottom], image[top:bottom] - plane, 0)
+
+        run_in_row_blocks(image.shape[0], block)
+        return heights
 
     @staticmethod
     def _enclosed_dropouts(valid: ndarray, raised: ndarray) -> ndarray:
@@ -85,7 +97,7 @@ class FeatureExtraction():
         on_border = (x == 0) | (y == 0) | (x + bw >= w) | (y + bh >= h)
         near_raised = cv2.dilate(raised.astype(uint8), cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (15, 15))) > 0
         touching = zeros(count, bool)
-        touching[unique(labels[near_raised & ~valid])] = True
+        touching[labels[near_raised & ~valid]] = True     # marks each label present, no sort needed
         keep = touching & ~on_border
         keep[0] = False  # label 0 is the pixels that do have a reading
         return keep[labels]
@@ -107,7 +119,17 @@ class FeatureExtraction():
             raised = raised | self._enclosed_dropouts(valid, raised)
         subject = raised.astype(uint8)
         kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (self.gap_close_px, self.gap_close_px))
-        self.binary_image = cv2.morphologyEx(subject, cv2.MORPH_CLOSE, kernel) * 255
+        # Close only around the subject: with a margin of twice the kernel size every pixel the
+        # closing can change is inside the window, and the window edge sees only zeros, so the
+        # result is the same as closing the whole image.
+        rows, cols = nonzero(subject.any(axis=1))[0], nonzero(subject.any(axis=0))[0]
+        margin = 2 * self.gap_close_px
+        top, bottom = max(rows[0] - margin, 0), min(rows[-1] + margin + 1, subject.shape[0])
+        left, right = max(cols[0] - margin, 0), min(cols[-1] + margin + 1, subject.shape[1])
+        self.binary_image = zeros(subject.shape, uint8)
+        self.binary_image[top:bottom, left:right] = cv2.morphologyEx(
+            subject[top:bottom, left:right], cv2.MORPH_CLOSE, kernel
+        ) * 255
         contours, hierachy = cv2.findContours(
             self.binary_image,
             cv2.RETR_EXTERNAL,
@@ -138,16 +160,22 @@ class FeatureExtraction():
         subject_hull = self._get_largest_subject(valid)
         if subject_hull is None:
             return False
-        inside = cv2.drawContours(valid.astype(uint8) * 0, [subject_hull], -1, 1, -1) > 0
+        # everything below only concerns pixels inside the hull, so work within its bounding box
+        left, top, box_w, box_h = cv2.boundingRect(subject_hull)
+        box = (slice(top, top + box_h), slice(left, left + box_w))
+        inside = zeros((box_h, box_w), uint8)
+        inside = cv2.drawContours(inside, [subject_hull - array([left, top], dtype=subject_hull.dtype)], -1, 1, -1) > 0
+        valid_box = valid[box]
         if glare_mask is not None:
             # as a share of the pixels that had a reading, dropouts would dilute it otherwise
-            glare_fraction = (glare_mask & inside).sum() / (inside & (valid | glare_mask)).sum()
+            glare_box = glare_mask[box]
+            glare_fraction = (glare_box & inside).sum() / (inside & (valid_box | glare_box)).sum()
             if glare_fraction > self.max_glare_fraction:
                 info(f"INFO : frame rejected, {glare_fraction:.0%} of the subject was glare")
                 return False
         hull_mm = (subject_hull.reshape(-1, 2) * self.pixel_pitch_mm).astype(float32)
         _, radius = cv2.minEnclosingCircle(hull_mm)
-        subject_heights = self.height_image[inside & valid]
+        subject_heights = self.height_image[box][inside & valid_box]
         support = min(self.depth_support_px, subject_heights.size)
 
         details = dict()

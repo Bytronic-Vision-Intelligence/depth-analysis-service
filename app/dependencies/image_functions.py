@@ -4,6 +4,7 @@ from os import cpu_count
 from cv2 import IMREAD_UNCHANGED, imdecode, getStructuringElement, connectedComponentsWithStats, dilate, erode, MORPH_RECT, CC_STAT_AREA
 from numpy import frombuffer, uint8, float32, ndarray, where, zeros, ones, isin, arange, vstack
 from logging import info
+from dependencies.row_blocks import run_in_row_blocks
 
 class Image():
     '''A class containing image processing functions'''
@@ -54,9 +55,16 @@ def find_spikes(image: ndarray, max_width: int = 51, min_jump: float = 5, min_ar
     # invalid pixels must neither pull the surface down nor push it up, otherwise a streak
     # with dropouts beside it looks as wide as the dropouts
     out_of_range = float32(1e6)
-    opened = dilate(where(valid, erode(where(valid, values, out_of_range), kernel), -out_of_range), kernel)
-    closed = erode(where(valid, dilate(where(valid, values, -out_of_range), kernel), out_of_range), kernel)
-    spikes = valid & ((values - opened > min_jump) | (closed - values > min_jump))
+    spikes = zeros(valid.shape, bool)
+
+    def block(top, bottom):
+        # the kernel is one row tall, so each row's result depends on that row alone
+        v, x = valid[top:bottom], values[top:bottom]
+        opened = dilate(where(v, erode(where(v, x, out_of_range), kernel), -out_of_range), kernel)
+        closed = erode(where(v, dilate(where(v, x, -out_of_range), kernel), out_of_range), kernel)
+        spikes[top:bottom] = v & ((x - opened > min_jump) | (closed - x > min_jump))
+
+    run_in_row_blocks(valid.shape[0], block, blocks=8)
     if not spikes.any():
         return spikes
 
