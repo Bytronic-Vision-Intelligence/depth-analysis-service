@@ -1,19 +1,24 @@
 from .base_functions.state import State
 from .publish_state import PublishState
 from dependencies.feature_functions import FeatureExtraction
+from dependencies.cycle_timing import mark, report
 
 class AnalysisState(State):
     ''''''
-    def __init__(self, state_machine,image, state_id = "Analysis State"):
+    def __init__(self, state_machine,image, glare_mask = None, state_id = "Analysis State"):
         super().__init__(state_machine, state_id)
         self.image = image
-        self.extractor = FeatureExtraction()
+        self.glare_mask = glare_mask
+        self.extractor = FeatureExtraction(state_machine.pixel_pitch_mm)
     def tick(self):
         ''''''
         image_details = self.extractor.get_subject_details(
-            self.image
+            self.image,
+            self.glare_mask
         )
+        mark(self.my_state_machine, "measure")
         if image_details == False:
+            report(self.my_state_machine, "no plate")
             self._return_idle()
             return
 

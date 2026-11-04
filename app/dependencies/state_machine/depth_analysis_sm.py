@@ -16,7 +16,12 @@ class DepthAnalysisSM(StateMachine):
         
         image_options = config.get("image_options")
         self.region_of_interest = image_options.get("region_of_interest")
-        self.trim_value = image_options.get("trim_value")
+        # [x, y] size of one pixel in mm, y is the line pitch divided by the camera's interpolate_y
+        self.pixel_pitch_mm = image_options.get("pixel_pitch_mm")
+        if self.pixel_pitch_mm is None:
+            raise ValueError("Error : image_options.pixel_pitch_mm must be set in the config as [x, y] in mm")
+        # message_id of the instruction the depth image was captured for, passed on with the result
+        self.message_id = None
         self.state = IdleState(self)
 
     @staticmethod
@@ -24,8 +29,8 @@ class DepthAnalysisSM(StateMachine):
         '''creates a set of listners for the given topics and adds
         qeueue objects to the dictionary as well as reference to the thread
         '''
-        broker = config.get('broker_details')
-        topics = broker.get("topics")
+        broker = config.get('mqtt')
+        topics = config.get("topics")
         topic_list = {}
         for topic in topics:
             topic_new = Topic(broker, topic)
@@ -35,7 +40,7 @@ class DepthAnalysisSM(StateMachine):
     @staticmethod
     def __create_mqtt_client(config:dict):
         '''creates an mqtt client object from the config'''
-        broker_details = config.get("broker_details")
+        broker_details = config.get("mqtt")
         
         mqtt_config = MQTTConfig(
             host=broker_details["mqtt_ip"], 

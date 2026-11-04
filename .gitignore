@@ -34,3 +34,7 @@ docs/superpowers/
 # Logs
 *.log
 data
+# Written by service-orchestrator at start-up from the project's config.
+# config.example.yaml documents the shape.
+app/configs/config*.yaml
+/config.yaml
