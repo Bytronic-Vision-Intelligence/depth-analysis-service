@@ -1,6 +1,8 @@
 from base64 import b64decode
+from concurrent.futures import ThreadPoolExecutor
+from os import cpu_count
 from cv2 import IMREAD_UNCHANGED, imdecode, getStructuringElement, connectedComponentsWithStats, dilate, erode, MORPH_RECT, CC_STAT_AREA
-from numpy import frombuffer, uint8, float32, ndarray, where, zeros, ones, isin, arange
+from numpy import frombuffer, uint8, float32, ndarray, where, zeros, ones, isin, arange, vstack
 from logging import info
 
 class Image():
@@ -103,3 +105,19 @@ def decode_image_from_bytes(data: bytes) -> ndarray:
     if image is None:
         raise ValueError("Could not decode image bytes.")
     return image
+
+#: camera-service joins the base64 of an image sent as strips with this (it never appears in base64)
+STRIP_SEPARATOR = "|"
+_STRIP_POOL = None
+
+def decode_image_text(encoded_image: str) -> ndarray:
+    """Decode a camera packet's image: one encoded image, or strips joined by "|" that
+    are decoded side by side and stacked top to bottom."""
+    parts = str(encoded_image).split(STRIP_SEPARATOR)
+    if len(parts) == 1:
+        return decode_image_from_bytes(extract_image(parts[0]))
+    global _STRIP_POOL
+    if _STRIP_POOL is None:
+        _STRIP_POOL = ThreadPoolExecutor(max_workers=min(8, cpu_count() or 1), thread_name_prefix="image_strip")
+    strips = list(_STRIP_POOL.map(lambda part: decode_image_from_bytes(extract_image(part)), parts))
+    return vstack(strips)

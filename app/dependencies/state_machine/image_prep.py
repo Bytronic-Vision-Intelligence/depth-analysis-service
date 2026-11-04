@@ -1,6 +1,6 @@
 from .base_functions.state import State
 from .analysis_state import AnalysisState
-from dependencies.image_functions import Image, decode_image_from_bytes, extract_image
+from dependencies.image_functions import Image, decode_image_text
 from dependencies.cycle_timing import mark, report
 from logging import info
 class ImagePrepState(State):
@@ -12,9 +12,7 @@ class ImagePrepState(State):
     def tick(self):
         '''prepares the image for analysis, creating the iamge object as it does'''
 
-        image_encoded = extract_image(self.message.get("image"))
-
-        image_decoded = decode_image_from_bytes(image_encoded)
+        image_decoded = decode_image_text(self.message.get("image"))
         mark(self.my_state_machine, "decode")
         if image_decoded.min() == image_decoded.max():
             report(self.my_state_machine, "single-value image")

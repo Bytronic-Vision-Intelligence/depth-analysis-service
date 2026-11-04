@@ -135,3 +135,32 @@ def main():
 
 if __name__ == "__main__":
     pytest.main()
+
+
+# ---- images sent as strips (camera-service `strips: N`)
+import base64 as _b64
+import cv2 as _cv2
+import numpy as _np
+from dependencies.image_functions import decode_image_text, STRIP_SEPARATOR
+
+
+def _png_text(image):
+    return _b64.b64encode(_cv2.imencode(".png", image)[1].tobytes()).decode("ascii")
+
+
+def _height_map():
+    return _np.random.default_rng(3).integers(0, 400, (96, 40), dtype=_np.uint16)
+
+
+def test_a_single_image_decodes_as_before():
+    image = _height_map()
+    assert _np.array_equal(decode_image_text(_png_text(image)), image)
+    assert _np.array_equal(decode_image_text("data:image/png;base64," + _png_text(image)), image)
+
+
+def test_strips_are_decoded_and_stacked_top_to_bottom():
+    image = _height_map()
+    text = STRIP_SEPARATOR.join(_png_text(image[a:b]) for a, b in ((0, 16), (16, 48), (48, 96)))
+    decoded = decode_image_text(text)
+    assert decoded.dtype == _np.uint16
+    assert _np.array_equal(decoded, image)
