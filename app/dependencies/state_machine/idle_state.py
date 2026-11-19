@@ -2,6 +2,7 @@ from .base_functions.state import State
 from dependencies.mqtt.mqtt_functions import check_for_messages
 from .image_prep import ImagePrepState
 from dependencies.cycle_timing import CycleTiming
+from .steak_state import apply_sku_updates
 
 class IdleState(State):
     ''''''
@@ -11,6 +12,8 @@ class IdleState(State):
     def tick(self):
         '''Waits for a message to be sent from the camera before moving to the image prep state'''
         self.__mqtt_watchdog()
+        if getattr(self.my_state_machine, "analysis", "plate") == "steak_thickness":
+            apply_sku_updates(self.my_state_machine)
         message = check_for_messages(self.my_state_machine.ui_request)
         instruction = message.get("image")
         if instruction == None: return

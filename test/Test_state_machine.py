@@ -40,6 +40,26 @@ def test_state_machine_requires_pixel_pitch(monkeypatch):
         depth_analysis_sm.DepthAnalysisSM(make_config({"region_of_interest": [0, 0, 10, 10]}))
 
 
+def test_steak_thickness_needs_no_pixel_pitch_and_takes_its_settings(monkeypatch):
+    monkeypatch.setattr(depth_analysis_sm, "MQTTClient", FakeMQTTClient)
+    config = make_config(None)
+    config["analysis"] = "steak_thickness"
+    config["steak_thickness"] = {"selected_sku": "sirloin_standard", "rim_mm": 4}
+    state_machine = depth_analysis_sm.DepthAnalysisSM(config)
+    assert state_machine.analysis == "steak_thickness"
+    assert state_machine.sku == "sirloin_standard" and state_machine.sku_spec == {}
+    assert state_machine.steak_settings["rim_mm"] == 4
+    assert state_machine.sku_update is None      # no sku_update topic configured: the defaults only
+
+
+def test_an_unknown_analysis_is_refused(monkeypatch):
+    monkeypatch.setattr(depth_analysis_sm, "MQTTClient", FakeMQTTClient)
+    config = make_config({"pixel_pitch_mm": [0.2, 0.2]})
+    config["analysis"] = "volume"
+    with pytest.raises(ValueError):
+        depth_analysis_sm.DepthAnalysisSM(config)
+
+
 def test_analysis_state_measures_with_the_configured_pitch():
     state = AnalysisState(SimpleNamespace(pixel_pitch_mm=[0.2, 0.05]), image=None)
     assert state.extractor.pixel_pitch_mm.tolist() == pytest.approx([0.2, 0.05])

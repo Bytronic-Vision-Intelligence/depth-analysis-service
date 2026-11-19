@@ -1,5 +1,6 @@
 from .base_functions.state import State
 from .analysis_state import AnalysisState
+from .steak_state import SteakState
 from dependencies.image_functions import Image, decode_image_text
 from dependencies.cycle_timing import mark, report
 from logging import info
@@ -11,6 +12,10 @@ class ImagePrepState(State):
 
     def tick(self):
         '''prepares the image for analysis, creating the iamge object as it does'''
+        if getattr(self.my_state_machine, "analysis", "plate") == "steak_thickness":
+            # a line profiler's height map: its own decode and measurement, no crop or glare removal
+            self.my_state_machine.change_state(SteakState(self.my_state_machine, self.message))
+            return
 
         image_decoded = decode_image_text(self.message.get("image"))
         mark(self.my_state_machine, "decode")

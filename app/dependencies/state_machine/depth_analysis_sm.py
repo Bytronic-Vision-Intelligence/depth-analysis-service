@@ -14,12 +14,26 @@ class DepthAnalysisSM(StateMachine):
         self.ui_request = self.__get_topic(self.topics,"receive_depth_image")
         self.service_output = self.__get_topic(self.topics, "send_depth_analysis")
         
-        image_options = config.get("image_options")
+        # what is measured: "plate" (default, the subject's size for the database search) or
+        # "steak_thickness" (a line profiler's height map per steak: thickness and wedge, judged
+        # per SKU, see dependencies/steak_thickness.py)
+        self.analysis = str(config.get("analysis") or "plate").strip().lower()
+        if self.analysis not in ("plate", "steak_thickness"):
+            raise ValueError(f"Error : analysis must be plate or steak_thickness, not {self.analysis!r}")
+        image_options = config.get("image_options") or {}
         self.region_of_interest = image_options.get("region_of_interest")
         # [x, y] size of one pixel in mm, y is the line pitch divided by the camera's interpolate_y
         self.pixel_pitch_mm = image_options.get("pixel_pitch_mm")
-        if self.pixel_pitch_mm is None:
+        if self.pixel_pitch_mm is None and self.analysis == "plate":
             raise ValueError("Error : image_options.pixel_pitch_mm must be set in the config as [x, y] in mm")
+        if self.analysis == "steak_thickness":
+            # the pixel size comes with every map (metadata.geometry), so no pitch is needed
+            self.steak_settings = dict(config.get("steak_thickness") or {})
+            self.sku_update = self.__get_topic(self.topics, "sku_update")
+            selected = self.steak_settings.get("selected_sku")
+            self.sku = None if selected is None else str(selected)
+            self.sku_name = None
+            self.sku_spec = {}
         # message_id of the instruction the depth image was captured for, passed on with the result
         self.message_id = None
         self.state = IdleState(self)
