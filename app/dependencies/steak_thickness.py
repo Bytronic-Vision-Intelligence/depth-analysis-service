@@ -12,8 +12,10 @@ What is measured (all in mm, on a square grid of grid_mm):
 - thickness: M&S measures "along the back fat", the thick long edge (the lean side tapers
   naturally). The map has no colour, so both long edges are measured: a band edge_band_mm (5)
   deep just inside the rim (3-8 mm in), over the middle edge_middle_fraction (60%) of the
-  steak's length, the median of each side. The thicker side is taken as the fat edge: thickness_mm = its median,
-  thin_edge_mm = the other's;
+  steak's length, the median of each side. The thicker side is taken as the fat edge:
+  thickness_mm = its median, thin_edge_mm = the other's. Fillet has no back fat (M&S: ruler at
+  the middle), so a SKU can set thickness_method: centre, judged on centre_mm = the median of
+  the steak's core;
 - whole-steak stats: median, min, max, p10, p90 of the interior;
 - wedge: median of each end (end_fraction of the length along the steak's long axis) and their
   difference, wedge_mm. Always reported; no spec gives a number ("wedge steaks not permitted"),
@@ -40,6 +42,7 @@ DEFAULTS = {
     "edge_band_mm": 5.0,        # depth of the long-edge bands, inside the rim (3-8 mm in)
     "edge_middle_fraction": 0.6,  # the edge bands cover this middle share of the length
     "end_fraction": 0.2,        # each end is this share of the length
+    "centre_fraction": 0.5,     # the centre: farther from the outline than this share of the deepest point
     "min_points": 20,           # fewest grid points for a reading (an edge or an end)
 }
 
@@ -109,8 +112,10 @@ def _round(value: Optional[float], digits: int = 2) -> Optional[float]:
     return None if value is None else round(float(value), digits)
 
 
-def measure_steak(height: np.ndarray, x_res_mm: float, y_res_mm: float, settings: Optional[dict] = None) -> Dict[str, Any]:
-    """Measure one steak's height map (mm, NaN = no data).
+def measure_steak(height: np.ndarray, x_res_mm: float, y_res_mm: float, settings: Optional[dict] = None,
+                  thickness_method: str = "edge") -> Dict[str, Any]:
+    """Measure one steak's height map (mm, NaN = no data). thickness_method (per SKU): "edge"
+    (the thicker long edge, default) or "centre" (the core, for fillet).
 
     Returns {"measurable": False, "reason": ...} when there is no steak to measure, otherwise
     {"measurable": True, "data": {...}} with every reading in mm (None when too few points).
@@ -161,8 +166,22 @@ def measure_steak(height: np.ndarray, x_res_mm: float, y_res_mm: float, settings
     edge_a = _reading(e_heights[middle & (e_across < 0)], min_points)
     edge_b = _reading(e_heights[middle & (e_across > 0)], min_points)
     edges = [e for e in (edge_a, edge_b) if e is not None]
-    thickness = max(edges) if edges else float(np.median(values))
     thin_edge = min(edges) if len(edges) == 2 else None
+
+    # the centre: the core farther from the outline than centre_fraction of the deepest point
+    # (a disc in a round steak, a strip along the middle of a long one)
+    core = interior & (dist_mm >= float(s["centre_fraction"]) * float(dist_mm.max()))
+    centre_reading = _reading(grid[core], min_points)
+
+    # the judged thickness: "edge" = the thicker long edge, taken as the back fat (sirloin,
+    # ribeye, rump, picanha: "measured along the back fat"); "centre" = the core (fillet: ruler
+    # at the middle, no back fat). Falls back to the whole steak's median.
+    if str(thickness_method).lower() == "centre" and centre_reading is not None:
+        thickness, source = centre_reading, "centre"
+    elif edges:
+        thickness, source = max(edges), "edge"
+    else:
+        thickness, source = float(np.median(values)), "median"
 
     # the two ends along the long axis
     end_len = float(s["end_fraction"]) * length_mm
@@ -171,9 +190,10 @@ def measure_steak(height: np.ndarray, x_res_mm: float, y_res_mm: float, settings
     wedge = abs(end_1 - end_2) if end_1 is not None and end_2 is not None else None
 
     data = {
-        "thickness_mm": _round(thickness),                 # the thicker long edge (taken as the fat edge)
-        "thickness_source": "edge" if edges else "median",
+        "thickness_mm": _round(thickness),                 # the judged one, see thickness_source
+        "thickness_source": source,                        # edge / centre / median (fallback)
         "thin_edge_mm": _round(thin_edge),
+        "centre_mm": _round(centre_reading),
         "median_mm": _round(np.median(values)),
         "min_mm": _round(np.min(values)),
         "max_mm": _round(np.max(values)),

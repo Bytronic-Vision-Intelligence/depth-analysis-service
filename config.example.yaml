@@ -57,6 +57,8 @@ image_options:
 #   # thickness is judged on thickness_mm, wedge on wedge_mm. A limit that is not set is not
 #   # judged: wedge has no number in any M&S spec ("wedge steaks not permitted"), so it is off
 #   # until one is agreed.
+#   # thickness_method: edge (default; the thicker long edge, M&S "measured along the back fat":
+#   # sirloin, ribeye, rump, picanha) or centre (the steak's core: fillet, ruler at the middle).
 #   sku_spec_defaults:
 #     sirloin_standard: {thickness: [15, 25]}
 #     sirloin_AA: {thickness: [15, 25]}
@@ -64,7 +66,7 @@ image_options:
 #     ribeye_standard: {thickness: [15, 25]}
 #     ribeye_AA: {thickness: [15, 25]}
 #     ribeye_thick_cut: {thickness: [30, 40]}
-#     fillet: {thickness: [20, 40]}
+#     fillet_standard: {thickness: [20, 40], thickness_method: centre}   # the only fillet SKU
 #     rump_standard: {thickness: [20, 35]}
 #     picanha: {thickness: [15, 30]}
 #   # Measurement settings (defaults shown)
@@ -76,4 +78,5 @@ image_options:
 #   edge_band_mm: 5.0           # long-edge band depth, inside the rim (3-8 mm in)
 #   edge_middle_fraction: 0.6   # the edge bands cover this middle share of the length
 #   end_fraction: 0.2           # each end (for the wedge) is this share of the length
+#   centre_fraction: 0.5        # centre = farther from the outline than this share of the deepest point
 #   min_points: 20              # fewest 1 mm grid points for a reading

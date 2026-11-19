@@ -62,6 +62,35 @@ def test_thickness_is_the_thicker_long_edge_not_the_median():
     assert d["wedge_mm"] == pytest.approx(0.0, abs=0.1)
 
 
+def round_steak(diameter_mm=70, centre_mm=30.0, edge_mm=20.0, margin_mm=10):
+    """A domed round steak (fillet): centre_mm in the middle, edge_mm at the outline."""
+    rows = int((diameter_mm + 2 * margin_mm) / Y_RES)
+    cols = int((diameter_mm + 2 * margin_mm) / X_RES)
+    r = diameter_mm / 2
+    y = (np.arange(rows) * Y_RES - margin_mm - r)[:, None]
+    x = (np.arange(cols) * X_RES - margin_mm - r)[None, :]
+    d = np.sqrt(x * x + y * y)
+    height = np.where(d <= r, centre_mm - (centre_mm - edge_mm) * (d / r) ** 2, 0.0).astype(np.float32)
+    return height
+
+
+def test_centre_method_reads_the_middle_of_a_round_steak():
+    edge = st.measure_steak(round_steak(), X_RES, Y_RES)["data"]
+    centre = st.measure_steak(round_steak(), X_RES, Y_RES, thickness_method="centre")["data"]
+    assert centre["thickness_source"] == "centre"
+    assert centre["thickness_mm"] == pytest.approx(29.0, abs=0.7)    # the core, near the 30 mm top
+    assert edge["thickness_source"] == "edge" and edge["thickness_mm"] < 25   # the edge band is lower
+    assert edge["centre_mm"] == centre["thickness_mm"]                       # always reported
+
+
+def test_steak_result_uses_the_skus_thickness_method():
+    state_machine = make_state_machine(sku="fillet_standard",
+                                       defaults={"fillet_standard": {"thickness": [20, 40], "thickness_method": "centre"}})
+    payload = steak_state.steak_result(packet(round_steak()), state_machine)
+    assert payload["data"]["thickness_source"] == "centre"
+    assert payload["verdict"] == {"verdict": "pass", "reason_failed": []}
+
+
 def test_wedge_is_the_difference_between_the_ends():
     d = st.measure_steak(height_map(thick=(24.0, 12.0)), X_RES, Y_RES)["data"]
     # each end's median sits a tenth of the length in: 24 - 1.2 vs 12 + 1.2

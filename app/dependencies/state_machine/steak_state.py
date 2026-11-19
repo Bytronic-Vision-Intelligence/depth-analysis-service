@@ -70,8 +70,10 @@ def steak_result(message: dict, state_machine) -> dict:
         raw = decode_image_text(message.get("image"))
         height = steak_thickness.decode_height_mm(raw)
         mark(state_machine, "decode")
+        limits = sku_limits(state_machine)
         measured = steak_thickness.measure_steak(
-            height, geometry.get("x_resolution_mm"), geometry.get("y_resolution_mm"), settings)
+            height, geometry.get("x_resolution_mm"), geometry.get("y_resolution_mm"), settings,
+            thickness_method=limits.get("thickness_method") or "edge")
     except Exception as exc:   # one bad packet loses one result, not the service
         warning(f"Steak height map could not be measured: {exc}")
         measured = {"measurable": False, "reason": f"height map error: {exc}"}
@@ -79,7 +81,7 @@ def steak_result(message: dict, state_machine) -> dict:
 
     if measured["measurable"]:
         payload["data"] = measured["data"]
-        decided = steak_thickness.judge(measured["data"], sku_limits(state_machine))
+        decided = steak_thickness.judge(measured["data"], limits)
         payload["checks"] = decided.pop("checks")
         payload["verdict"] = decided
     else:
