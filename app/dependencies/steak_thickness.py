@@ -12,8 +12,8 @@ What is measured (all in mm, on a square grid of grid_mm):
 - thickness: M&S measures "along the back fat", the thick long edge (the lean side tapers
   naturally). The map has no colour, so both long edges are measured: a band edge_band_mm (5)
   deep just inside the rim (3-8 mm in), over the middle edge_middle_fraction (60%) of the
-  steak's length, the median of each side. The thicker side is taken as the fat edge:
-  thickness_mm = its median, thin_edge_mm = the other's. Fillet has no back fat (M&S: ruler at
+  steak's length, the edge_percentile (p90) of each side. The thicker side is taken as the fat
+  edge: thickness_mm = its p90, thin_edge_mm = the other's. Fillet has no back fat (M&S: ruler at
   the middle), so a SKU can set thickness_method: centre, judged on centre_mm = the median of
   the steak's core;
 - whole-steak stats: median, min, max, p10, p90 of the interior;
@@ -40,6 +40,7 @@ DEFAULTS = {
     "close_mm": 3.0,            # no-data specks up to about this size inside the steak are closed
     "rim_mm": 3.0,              # the edge left out of every reading (slope, rounded fat, shadows)
     "edge_band_mm": 5.0,        # depth of the long-edge bands, inside the rim (3-8 mm in)
+    "edge_percentile": 90.0,    # each edge band's reading (90 = the fat's height, not the dip beside it)
     "edge_middle_fraction": 0.6,  # the edge bands cover this middle share of the length
     "end_fraction": 0.2,        # each end is this share of the length
     "centre_fraction": 0.5,     # the centre: farther from the outline than this share of the deepest point
@@ -101,11 +102,12 @@ def steak_mask(grid: np.ndarray, s: dict) -> Optional[np.ndarray]:
     return filled.astype(bool)
 
 
-def _reading(values: np.ndarray, min_points: int) -> Optional[float]:
+def _reading(values: np.ndarray, min_points: int, percentile: float = 50.0) -> Optional[float]:
     values = values[~np.isnan(values)]
     if values.size < min_points:
         return None
-    return float(np.median(values))
+    reading = float(np.percentile(values, percentile))
+    return reading
 
 
 def _round(value: Optional[float], digits: int = 2) -> Optional[float]:
@@ -158,13 +160,17 @@ def measure_steak(height: np.ndarray, x_res_mm: float, y_res_mm: float, settings
 
     # the two long edges: a band edge_band_mm deep just inside the rim (3-8 mm in by default:
     # past the rounded edge / laser-shadow pixels, but still on the fat cap, often only 5-10 mm
-    # wide), over the middle edge_middle_fraction of the length; each side's median
+    # wide), over the middle edge_middle_fraction of the length; each side's edge_percentile (90):
+    # as long as part of the band is on the fat, the fat's height is read, not the dip next to it
+    # or the rounded edge (office dummy steak, 2026-11-19: median read 15.9 on one face and 13.7
+    # on the other; p90 17.5-18.3 on both, hand-measured 17-18)
     ey, ex = np.nonzero(interior & (dist_mm <= rim + float(s["edge_band_mm"])))
     epoints = np.column_stack((ex, ey)).astype(np.float64) * g - centre
     e_along, e_across, e_heights = epoints @ major, epoints @ minor, grid[ey, ex]
     middle = np.abs(e_along - (along_all.min() + along_all.max()) / 2) <= float(s["edge_middle_fraction"]) * length_mm / 2
-    edge_a = _reading(e_heights[middle & (e_across < 0)], min_points)
-    edge_b = _reading(e_heights[middle & (e_across > 0)], min_points)
+    edge_q = float(s["edge_percentile"])
+    edge_a = _reading(e_heights[middle & (e_across < 0)], min_points, edge_q)
+    edge_b = _reading(e_heights[middle & (e_across > 0)], min_points, edge_q)
     edges = [e for e in (edge_a, edge_b) if e is not None]
     thin_edge = min(edges) if len(edges) == 2 else None
 

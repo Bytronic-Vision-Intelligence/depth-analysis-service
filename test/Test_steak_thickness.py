@@ -91,6 +91,21 @@ def test_steak_result_uses_the_skus_thickness_method():
     assert payload["verdict"] == {"verdict": "pass", "reason_failed": []}
 
 
+def test_a_dip_beside_the_fat_does_not_pull_the_edge_reading_down():
+    # fat strip 18 mm high, 3-6 mm in from the left edge; a 14 mm dip right next to it (6-8 mm
+    # in); the rest 15 mm: the edge band (3-8 mm in) is 60% fat, 40% dip
+    height = height_map(thick=(15.0, 15.0))
+    cols = height.shape[1]
+    x = np.arange(cols) * X_RES - 10                      # mm from the left edge (margin 10)
+    inside = height > 0
+    height[:, (x > 3) & (x <= 6)] = np.where(inside[:, (x > 3) & (x <= 6)], 18.0, 0.0)
+    height[:, (x > 6) & (x <= 8)] = np.where(inside[:, (x > 6) & (x <= 8)], 14.0, 0.0)
+    d = st.measure_steak(height, X_RES, Y_RES)["data"]
+    assert d["thickness_mm"] == pytest.approx(18.0, abs=0.1)    # the fat, p90 of the band
+    median = st.measure_steak(height, X_RES, Y_RES, {"edge_percentile": 50})["data"]
+    assert median["thickness_mm"] < 18.0                         # the median is pulled into the dip
+
+
 def test_wedge_is_the_difference_between_the_ends():
     d = st.measure_steak(height_map(thick=(24.0, 12.0)), X_RES, Y_RES)["data"]
     # each end's median sits a tenth of the length in: 24 - 1.2 vs 12 + 1.2

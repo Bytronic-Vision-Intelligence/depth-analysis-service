@@ -39,7 +39,7 @@ image_options:
 # --- analysis: steak_thickness (Dunbia Line 1, Gocator 2150 in part mode) ---------------------
 # One height map per steak from camera-service (uint16 PNG, 0.01 mm, 0 = no data, belt = 0 mm;
 # the pixel size and the part's timing come in its metadata, so image_options is not needed).
-# Result: thickness (the thicker long edge's median, taken as the back-fat edge M&S measures
+# Result: thickness (the thicker long edge's p90, taken as the back-fat edge M&S measures
 # along), whole-steak median / min / max / p10 / p90, wedge (difference of the ends' medians,
 # always reported); judged per SKU; trigger_time for verdict-service. No length / width / area:
 # along the belt they depend on the belt speed, which is not known well enough.
@@ -76,6 +76,7 @@ image_options:
 #   close_mm: 3.0               # no-data specks up to this size inside the steak are closed
 #   rim_mm: 3.0                 # edge left out of every reading (slope, rounded fat, shadows)
 #   edge_band_mm: 5.0           # long-edge band depth, inside the rim (3-8 mm in)
+#   edge_percentile: 90         # each band's reading: the fat's height, not the dip beside it
 #   edge_middle_fraction: 0.6   # the edge bands cover this middle share of the length
 #   end_fraction: 0.2           # each end (for the wedge) is this share of the length
 #   centre_fraction: 0.5        # centre = farther from the outline than this share of the deepest point
