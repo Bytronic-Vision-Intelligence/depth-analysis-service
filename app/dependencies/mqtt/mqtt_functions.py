@@ -1,9 +1,11 @@
 from mqtt_client import MQTTClient, MQTTConfig
 import threading
-from queue import Queue
+from queue import Queue, Empty
 from .topic import Topic
 from json import loads
 from logging import info
+
+TRIGGER_WAIT_S = 0.05   # longest wait for a trigger per idle tick (keeps the idle loop off the CPU)
 
 def check_for_messages(topic:Topic):
     '''Checks the queue for each of the trigger topics and returns the message when any of them have received one
@@ -25,10 +27,15 @@ def check_for_messages(topic:Topic):
         except Exception as e:
             if e != KeyError: info(f"error occured when checking for trigger {e}")
     
+    # wait a little for the trigger instead of get_nowait(): main runs `while True: runtime()`, so
+    # a non-blocking poll spins a whole core while idle (same fix as camera/database-service,
+    # 2026-11-17). A trigger still arrives at once; at most TRIGGER_WAIT_S is added to other work.
     try:
-        message = loads(topic.queue.get_nowait())
+        message = loads(topic.queue.get(block=True, timeout=TRIGGER_WAIT_S))
+    except Empty:
+        pass
     except Exception as e:
-        if e != KeyError: info(f"error occured when checking for trigger {e}")
+        info(f"error occured when checking for trigger {e}")
 
     return message
 
